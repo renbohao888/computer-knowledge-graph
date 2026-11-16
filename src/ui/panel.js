@@ -16,7 +16,7 @@ function rowFor(oid, relOf) {
   if (!o) return '';
   const e = relOf.get(oid);
   const tag = e ? `${e.dir === 'out' ? '→' : '←'} ${KB.esc(e.relation)}` : KB.esc(o.layer);
-  const c = KB.STATUS_COLOR[o.status] || '#9fb3cc';
+  const c = KB.STATUS_COLOR[KB.effStatus(o)] || '#9fb3cc';
   return `<li><button data-goto="${KB.esc(oid)}">
     <span class="dot" style="background:${c};color:${c}"></span>
     <span class="nb-name">${KB.esc(o.name)}</span>
@@ -69,7 +69,8 @@ KB.renderPanel = function (id) {
     </div>`;
   }).join('');
 
-  const color = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+  const st = KB.effStatus(n);
+  const color = KB.STATUS_COLOR[st] || '#9fb3cc';
   panel.innerHTML = `
     <button class="panel-close" data-close aria-label="关闭详情">✕</button>
     ${KB.state.track ? `<button class="p-back" data-backtrack>← ${KB.esc(KB.state.track)} 方向</button>` : ''}
@@ -80,10 +81,15 @@ KB.renderPanel = function (id) {
     </div>
     <h2 class="p-title">${KB.esc(n.name)}</h2>
     <div class="p-chips">
-      <span class="chip chip-status" style="--c:${color}">${KB.esc(n.status)}</span>
+      <span class="chip chip-status" style="--c:${color}">${KB.esc(st)}</span>
       <span class="chip">${KB.esc(n.domain)}</span>
       ${n.tracks.length ? `<span class="chip">${KB.esc(n.tracks.join(' / '))}</span>` : ''}
       <span class="chip chip-dim">${n._deg} 条连线</span>
+    </div>
+    <div class="p-progress">
+      <span>我的进度</span>
+      ${KB.STATUS_LIST.map(s => `<button class="p-prog${st === s ? ' active' : ''}" data-progress="${KB.esc(s)}" style="--c:${KB.STATUS_COLOR[s]}">${KB.esc(s)}</button>`).join('')}
+      ${KB.hasProgress(n) ? `<em>作者标注 ${KB.esc(n.status)}</em>` : ''}
     </div>
     <p class="p-desc">${KB.esc(n.description)}</p>
     <p class="p-layerdef">${KB.esc(KB.LAYER_INFO[n.layer] || '')}</p>
@@ -111,7 +117,7 @@ KB.renderTrackPanel = function (name) {
   if (!info) return;
 
   const nodes = KB.NODES.filter(n => n.tracks.includes(name));
-  const counts = KB.STATUS_LIST.map(s => ({ s, c: nodes.filter(n => n.status === s).length }));
+  const counts = KB.STATUS_LIST.map(s => ({ s, c: nodes.filter(n => KB.effStatus(n) === s).length }));
   const pct = Math.round((counts[0].c / Math.max(1, nodes.length)) * 100);
   const layerHas = new Set(nodes.map(n => n.layer));
   const groups = KB.LAYERS
@@ -136,11 +142,12 @@ KB.renderTrackPanel = function (name) {
       <div class="p-group">
         <div class="p-group-title"><span>${KB.esc(g.l)}</span><b style="margin-left:auto">${g.arr.length}</b></div>
         <ul class="p-nb">${g.arr.map(n => {
-          const c = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+          const s2 = KB.effStatus(n);
+          const c = KB.STATUS_COLOR[s2] || '#9fb3cc';
           return `<li><button data-goto="${KB.esc(n.id)}">
             <span class="dot" style="background:${c};color:${c}"></span>
             <span class="nb-name">${KB.esc(n.name)}</span>
-            <span class="nb-rel">${KB.esc(n.status)}</span>
+            <span class="nb-rel">${KB.esc(s2)}</span>
           </button></li>`;
         }).join('')}</ul>
       </div>`).join('')}
@@ -162,6 +169,8 @@ KB.bindPanel = function () {
   KB.getPanel().addEventListener('click', (e) => {
     const go = e.target.closest('[data-goto]');
     if (go) { KB.selectNode(go.dataset.goto, true); return; }
+    const pr = e.target.closest('[data-progress]');
+    if (pr) { KB.setProgress(KB.state.selected, pr.dataset.progress); return; }
     if (e.target.closest('[data-focus]')) { KB.toggleFocus(KB.state.selected); return; }
     if (e.target.closest('[data-backtrack]')) { if (KB.state.track) KB.renderTrackPanel(KB.state.track); return; }
     if (e.target.closest('[data-clear-track]')) { KB.selectTrack(KB.state.track); return; }

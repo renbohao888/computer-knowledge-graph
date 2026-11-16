@@ -27,7 +27,7 @@ KB.buildRailUI = function () {
   const statusList = document.getElementById('statusList');
   if (statusList) {
     statusList.innerHTML = KB.STATUS_LIST.map(s => {
-      const c = KB.NODES.filter(n => n.status === s).length;
+      const c = KB.NODES.filter(n => KB.effStatus(n) === s).length;
       return `<button class="status-row${KB.state.status === s ? ' active' : ''}" data-status="${KB.esc(s)}">
         <i class="s-dot" style="--c:${KB.STATUS_COLOR[s]}"></i>
         <span>${KB.esc(s)}</span><em>${c}</em>
@@ -35,7 +35,7 @@ KB.buildRailUI = function () {
     }).join('');
   }
 
-  const mastered = KB.NODES.filter(n => n.status === '已掌握').length;
+  const mastered = KB.NODES.filter(n => KB.effStatus(n) === '已掌握').length;
   const pct = Math.round(mastered / Math.max(1, KB.NODES.length) * 100);
   const bar = document.getElementById('progressBar');
   if (bar) bar.style.width = pct + '%';
@@ -93,6 +93,11 @@ KB.syncFilterUI = function () {
 };
 
 KB.bindRail = function () {
+  /* 分区标题可折叠：14 个方向 + 13 层太长了 */
+  document.querySelectorAll('.rail-title').forEach(el => {
+    el.addEventListener('click', () => el.parentElement.classList.toggle('collapsed'));
+  });
+
   const trackGrid = document.getElementById('trackGrid');
   if (trackGrid) {
     trackGrid.addEventListener('click', (e) => {
@@ -174,6 +179,22 @@ KB.bindRail = function () {
       KB.updateFocusBadge();
       KB.syncFilterUI();
       KB.fitView();
+    });
+  }
+
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => KB.exportProgress());
+  }
+
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', () => {
+      const f = importFile.files && importFile.files[0];
+      if (f) KB.importProgressFile(f);
+      importFile.value = '';
     });
   }
 

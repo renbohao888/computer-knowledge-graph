@@ -26,8 +26,8 @@
     <div class="track-grid" id="trackGrid"></div>
   </div>
 
-  <div class="rail-section">
-    <div class="rail-title"><span>分层</span><em>点击筛选</em></div>
+  <div class="rail-section collapsed">
+    <div class="rail-title"><span>分层</span><em>点画面上的层名也行</em></div>
     <ul id="layerList"></ul>
   </div>
 
@@ -36,6 +36,12 @@
     <div id="statusList"></div>
     <div class="progress"><i id="progressBar"></i></div>
     <p class="progress-text" id="progressText"></p>
+    <div class="progress-actions">
+      <button id="exportBtn" title="把本地进度导出成 JSON">导出进度</button>
+      <button id="importBtn" title="从 JSON 导入进度">导入</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <span id="progressMsg"></span>
+    </div>
   </div>
 
   <div class="rail-foot">
@@ -80,9 +86,15 @@
 
 <script src="src/config.js"></script>
 <script src="src/data/nodes.js"></script>
+<script src="src/data/nodes-client.js"></script>
+<script src="src/data/nodes-engineering.js"></script>
+<script src="src/data/nodes-data-ai.js"></script>
+<script src="src/data/nodes-systems.js"></script>
 <script src="src/data/links.js"></script>
+<script src="src/data/links-more.js"></script>
 <script src="src/core/util.js"></script>
 <script src="src/core/store.js"></script>
+<script src="src/core/progress.js"></script>
 <script src="src/core/graph.js"></script>
 <script src="src/core/actions.js"></script>
 <script src="src/ui/tooltip.js"></script>

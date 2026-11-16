@@ -124,7 +124,7 @@ function renderSearchResults() {
   box.innerHTML = srList.length
     ? srList.map((r, i) => `
         <button class="sr-item${i === srIndex ? ' active' : ''}" data-id="${KB.esc(r.id)}" data-child="${KB.esc(r.child || '')}" role="option">
-          <span class="sr-dot" style="background:${KB.STATUS_COLOR[(KB.byId[r.id] || {}).status] || '#9fb3cc'}"></span>
+          <span class="sr-dot" style="background:${KB.STATUS_COLOR[KB.effStatus(KB.byId[r.id])] || '#9fb3cc'}"></span>
           <span class="sr-name">${hl(r.name, q)}${r.child ? `<em> › ${hl(r.child, q)}</em>` : ''}</span>
           <span class="sr-layer">${KB.esc(r.layer)}</span>
         </button>`).join('')

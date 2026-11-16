@@ -22,11 +22,12 @@ KB.bindTooltip = function () {
 
 KB.showNodeTip = function (n) {
   const el = KB.getTip();
-  const color = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+  const st = KB.effStatus(n);
+  const color = KB.STATUS_COLOR[st] || '#9fb3cc';
   el.innerHTML = `
     <div class="tt-name">${KB.esc(n.name)}</div>
     <div class="tt-meta"><span>${KB.esc(n.layer)}</span><span>${KB.esc(n.domain)}</span></div>
-    <div class="tt-status" style="--c:${color};color:${color}">${KB.esc(n.status)}</div>`;
+    <div class="tt-status" style="--c:${color};color:${color}">${KB.esc(st)}</div>`;
   el.style.left = mx + 'px';
   el.style.top = my + 'px';
   el.classList.add('show');

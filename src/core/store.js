@@ -85,7 +85,7 @@ KB.matches = function (n) {
   if (s.track && !(n.tracks || []).includes(s.track)) return false;
   if (s.layer && n.layer !== s.layer) return false;
   if (s.domain && n.domain !== s.domain) return false;
-  if (s.status && n.status !== s.status) return false;
+  if (s.status && KB.effStatus(n) !== s.status) return false;
   return true;
 };
 

@@ -13,10 +13,16 @@
 
 | 想改什么 | 改哪个文件 |
 |---|---|
-| 知识点本身 | `src/data/nodes.js` |
-| 知识点之间的关系 | `src/data/links.js` |
+| 软件系统主干的知识点 | `src/data/nodes.js` |
+| 前端 / 移动端 / iOS | `src/data/nodes-client.js` |
+| 架构、测试、安全、图形与音视频 | `src/data/nodes-engineering.js` |
+| AI、数据、数学与算法 | `src/data/nodes-data-ai.js` |
+| 网络、运行时、基础设施、嵌入式、硬件 | `src/data/nodes-systems.js` |
+| 知识点之间的关系 | `src/data/links.js` 或 `links-more.js` |
 | 分层、方向、颜色 | `src/config.js` |
 | 页面结构 / 样式 / 交互 | `index.html`、`src/*.js`、`src/styles.css` |
+
+拿不准放哪时：先看目标节点所在的 `layer`，再按学科选文件；实在不确定就放进 `nodes.js`，review 时再挪。
 
 数据是纯 JS 字面量，Git 里可 diff、可 review，不需要数据库。
 
@@ -40,9 +46,9 @@
 |---|---|---|
 | `id` | ✓ | 唯一，小写英文 + 连字符，连线用它引用 |
 | `name` | ✓ | 显示名（中文优先） |
-| `layer` | ✓ | 必须是 `config.js` 里 `LAYERS` 的一项 |
+| `layer` | ✓ | 必须是 `config.js` 里 `LAYERS` 的一项（共 13 层） |
 | `domain` | ✓ | 问题域：性能 / 可用性 / 安全 / 一致性 / 可观测性 / 交付运维 / 研发效率 / 网络通信 |
-| `status` | ✓ | `已掌握` / `待补充` / `模糊`（按作者视角标，别人可以改） |
+| `status` | ✓ | `已掌握` / `待补充` / `模糊`。这是作者的初始标注，读者可以在页面上用自己的进度覆盖它，所以按"这个知识点本身的难度/常见程度"标比按个人情况更合适 |
 | `tracks` | ✓ | 学习方向，可多个，必须在 `TRACKS` 里 |
 | `before` | ✓ | 学它之前要先懂的节点 id，没有就写 `[]` |
 | `description` | ✓ | 一两句话：它是什么、为什么重要 |

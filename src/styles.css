@@ -61,16 +61,19 @@ body.labels-off #labels{opacity:0}
 /* 层刻度：把 8 个分层在画面上的高度标出来，和 3D 里的平面一一对应 */
 #layerAxis{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
 .axis-row{
-  position:absolute;left:292px;right:0;display:flex;align-items:center;gap:10px;
+  position:absolute;left:292px;display:flex;align-items:center;gap:8px;
   transform:translateY(-50%);transition:opacity .2s;
 }
 .axis-row span{
-  flex:none;width:74px;font-size:10px;color:#4f6080;letter-spacing:.04em;
+  flex:none;font-size:10px;color:#4f6080;letter-spacing:.04em;
   text-align:left;white-space:nowrap;
+  pointer-events:auto;cursor:pointer;padding:2px 4px;border-radius:4px;
+  transition:color .15s,background .15s;
 }
+.axis-row span:hover{color:#9fc9e8;background:rgba(92,200,255,.08)}
 .axis-row i{
-  flex:1;height:1px;
-  background:repeating-linear-gradient(90deg,rgba(124,168,224,.16) 0 3px,transparent 3px 10px);
+  flex:none;width:34px;height:1px;
+  background:repeating-linear-gradient(90deg,rgba(124,168,224,.16) 0 3px,transparent 3px 9px);
 }
 .axis-row.active span{color:var(--cyan)}
 .axis-row.active i{background:repeating-linear-gradient(90deg,rgba(92,200,255,.42) 0 3px,transparent 3px 10px)}
@@ -98,6 +101,10 @@ body.labels-off #labels{opacity:0}
 .rail-sub b{color:#b9c9e2;font-weight:600}
 
 .rail-section{margin-top:14px}
+.rail-title{cursor:pointer;user-select:none}
+.rail-title::after{content:'▾';font-size:9px;color:#41506a;margin-left:2px;transition:transform .15s}
+.rail-section.collapsed > *:not(.rail-title){display:none}
+.rail-section.collapsed .rail-title::after{transform:rotate(-90deg)}
 .rail-title{
   display:flex;justify-content:space-between;align-items:baseline;
   font-size:11px;color:var(--faint);letter-spacing:.06em;margin-bottom:6px;
@@ -298,6 +305,29 @@ body.labels-off #labels{opacity:0}
 .ts-row i{width:6px;height:6px;border-radius:50%;flex:none}
 .ts-row b{margin-left:auto;font-weight:500;color:#cfdbee}
 .p-note{font-size:11.5px;color:#4d5d77;padding:4px 8px}
+
+/* —— 我的进度 —— */
+.p-progress{display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap}
+.p-progress > span{font-size:11px;color:#5f7191;letter-spacing:.03em}
+.p-prog{
+  padding:4px 9px;border-radius:7px;font-size:11.5px;color:#8697b3;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+  transition:color .15s,border-color .15s,background .15s;
+}
+.p-prog:hover{background:rgba(255,255,255,.07);color:#cfdbee}
+.p-prog.active{
+  color:var(--c);border-color:color-mix(in srgb,var(--c) 45%,transparent);
+  background:color-mix(in srgb,var(--c) 12%,transparent);
+}
+.p-progress em{margin-left:auto;font-style:normal;font-size:10.5px;color:#4d5d77}
+
+.progress-actions{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.progress-actions button{
+  font-size:10.5px;color:#5f7191;padding:2px 0;
+  border-bottom:1px dashed rgba(124,168,224,.25);
+}
+.progress-actions button:hover{color:#9fc9e8}
+.progress-actions span{font-size:10.5px;color:#5f9e74}
 
 /* —— 连线关系标签 —— */
 .edge-label{

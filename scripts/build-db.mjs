@@ -19,8 +19,15 @@ const ctx = { matchMedia: () => ({ matches: false }) };
 vm.createContext(ctx);
 ctx.window = ctx;
 vm.runInContext(read('src/config.js'), ctx);
-vm.runInContext(read('src/data/nodes.js'), ctx);
-vm.runInContext(read('src/data/links.js'), ctx);
+[
+  'src/data/nodes.js',
+  'src/data/nodes-client.js',
+  'src/data/nodes-engineering.js',
+  'src/data/nodes-data-ai.js',
+  'src/data/nodes-systems.js',
+  'src/data/links.js',
+  'src/data/links-more.js'
+].forEach(f => vm.runInContext(read(f), ctx));
 
 const KB = ctx.KB;
 fs.mkdirSync(path.join(root, 'data'), { recursive: true });

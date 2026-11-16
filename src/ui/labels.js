@@ -193,6 +193,10 @@ KB.buildAxis = function () {
     const el = document.createElement('div');
     el.className = 'axis-row';
     el.innerHTML = `<span>${KB.esc(l)}</span><i></i>`;
+    el.querySelector('span').addEventListener('click', () => {
+      KB.state.layer = (KB.state.layer === l) ? null : l;
+      KB.syncFilterUI();
+    });
     box.appendChild(el);
     axisRows.set(l, el);
   });
@@ -202,12 +206,27 @@ KB.updateAxis = function (cam) {
   if (!axisRows.size) return;
   if (!axisVec) axisVec = KB.graph.camera().position.clone();
   const h = window.innerHeight;
+
+  /* 用这一层节点的实际投影中位数来放刻度，
+     斜视角下比"层的世界坐标中心"准得多 */
+  const ys = {};
+  KB.LAYERS.forEach(l => { ys[l] = []; });
+  for (let i = 0; i < KB.NODES.length; i++) {
+    const n = KB.NODES[i];
+    if (!n.__threeObj || !ys[n.layer]) continue;
+    axisVec.copy(n.__threeObj.position).project(cam);
+    if (axisVec.z > 1 || axisVec.y < -1.1 || axisVec.y > 1.1) continue;
+    ys[n.layer].push((-axisVec.y * 0.5 + 0.5) * h);
+  }
+
   KB.LAYERS.forEach(l => {
     const el = axisRows.get(l);
     if (!el) return;
-    axisVec.set(0, KB.layerY[l], 0).project(cam);
-    if (axisVec.z > 1 || axisVec.y < -1.05 || axisVec.y > 1.05) { el.style.opacity = '0'; return; }
-    el.style.top = ((-axisVec.y * 0.5 + 0.5) * h).toFixed(1) + 'px';
+    const arr = ys[l];
+    if (!arr.length) { el.style.opacity = '0'; return; }
+    arr.sort((a, b) => a - b);
+    const med = arr[Math.floor(arr.length / 2)];
+    el.style.top = med.toFixed(1) + 'px';
     el.style.opacity = '';
     el.classList.toggle('active', KB.state.layer === l);
   });

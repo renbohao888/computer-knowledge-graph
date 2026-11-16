@@ -17,10 +17,10 @@ KB.colorOfNode = function (n) {
     if (!KB.matches(n) || (s.focus && !KB.inFocusSet(n.id))) {
       return KB.fade(KB.TRACKS[s.track].color, 0.82);
     }
-    const t = KB.STATUS_TINT[n.status];
+    const t = KB.STATUS_TINT[KB.effStatus(n)];
     return KB.fade(KB.TRACKS[s.track].color, t != null ? t : 0.2);
   }
-  const base = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+  const base = KB.STATUS_COLOR[KB.effStatus(n)] || '#9fb3cc';
   if (s.focus && !KB.inFocusSet(n.id)) return KB.fade(base, 0.84);
   if (!KB.matches(n)) return KB.fade(base, 0.74);
   return base;
@@ -63,8 +63,8 @@ KB.initGraph = function () {
 
   g.backgroundColor(KB.BG)
     .showNavInfo(false)
-    .nodeRelSize(8)
-    .nodeResolution(15)
+    .nodeRelSize(6.2)
+    .nodeResolution(14)
     .nodeOpacity(1)
     .nodeVal(KB.nodeSize)
     .nodeColor(KB.colorOfNode)
@@ -81,16 +81,26 @@ KB.initGraph = function () {
     .onBackgroundClick(KB.handleBackgroundClick)
     .onEngineStop(KB.handleEngineStop);
 
-  g.d3Force('charge').strength(-460).distanceMax(1100);
+  g.d3Force('charge').strength(-820).distanceMax(1500);
   g.d3Force('link')
-    .distance(l => l.learn ? 40 : (KB.sameLayerLink(l) ? 62 : 112))
-    .strength(l => l.learn ? 0 : 0.45);   // 学习路径不参与布局
+    .distance(l => l.learn ? 40 : (KB.sameLayerLink(l) ? 85 : 150))
+    .strength(l => l.learn ? 0 : 0.4);    // 学习路径不参与布局
 
-  /* 收敛得快一点，首屏不用等太久就能开始点 */
-  g.d3AlphaDecay(0.024).warmupTicks(60).cooldownTicks(180);
+  /* 把节点往 z=0 拉，让每一层尽量落在同一个深度平面上。
+     否则斜视角下层与层会互相穿插，刻度也对不齐。 */
+  const forceZ = (alpha) => {
+    const k = 0.35 * alpha;
+    for (let i = 0; i < KB.NODES.length; i++) {
+      KB.NODES[i].vz += (0 - KB.NODES[i].z) * k;
+    }
+  };
+  forceZ.initialize = () => {};
+  g.d3Force('z', forceZ);
 
-  /* 初始用斜视角，否则 11 层会压成一条竖线 */
-  g.cameraPosition({ x: 620, y: 300, z: 880 }, { x: 0, y: 0, z: 0 }, 0);
+  g.d3AlphaDecay(0.02).warmupTicks(80).cooldownTicks(240);
+
+  /* 低俯角 + 一点方位角：层带清晰，同时保留景深，不会压成一条竖线 */
+  g.cameraPosition({ x: 0, y: 140, z: 1280 }, { x: 0, y: 0, z: 0 }, 0);
 
   KB.graph = g;
   g.graphData({ nodes: KB.NODES, links: KB.graphLinks });
@@ -155,41 +165,58 @@ KB.flyToSearch = function (node) {
   );
 };
 
-KB.fitView = function () {
+/* 屏幕空间取景：按投影后的包围盒填满画面。
+   zoomToFit 按包围球算，节点一多景深会浪费大半个屏幕。 */
+KB.fitNodes = function (nodes, ms) {
   if (!KB.graph) return;
-  KB.clearHover();
-  KB.graph.zoomToFit(KB.reduceMotion ? 0 : 900, 34);
-};
-
-/* 把镜头收到一组节点的包围球上（方向模式） */
-KB.fitSubset = function (ids) {
-  if (!KB.graph) return;
-  const ns = ids.map(id => KB.byId[id]).filter(n => n && typeof n.x === 'number');
+  const ns = (nodes || []).filter(n => n && n.__threeObj);
   if (!ns.length) return;
+  const cam = KB.graph.camera();
+  if (!cam) return;
   KB.clearHover();
 
   let cx = 0, cy = 0, cz = 0;
   ns.forEach(n => { cx += n.x; cy += n.y; cz += n.z; });
   cx /= ns.length; cy /= ns.length; cz /= ns.length;
 
-  let r = 0;
-  ns.forEach(n => { r = Math.max(r, Math.hypot(n.x - cx, n.y - cy, n.z - cz)); });
-  r = Math.max(r, 45);
-
-  const cam = KB.graph.camera();
-  const fov = ((cam && cam.fov) || 50) * Math.PI / 180;
-  const dist = (r / Math.sin(fov / 2)) * 1.18;
-
   const cur = KB.graph.cameraPosition();
   let ux = cur.x - cx, uy = cur.y - cy, uz = cur.z - cz;
-  const len = Math.hypot(ux, uy, uz) || 1;
-  ux /= len; uy /= len; uz /= len;
+  let dist = Math.hypot(ux, uy, uz) || 600;
+  ux /= dist; uy /= dist; uz /= dist;
+
+  const v = cam.position.clone();
+  for (let i = 0; i < 3; i++) {
+    cam.position.set(cx + ux * dist, cy + uy * dist, cz + uz * dist);
+    cam.lookAt(cx, cy, cz);
+    cam.updateMatrixWorld(true);
+    cam.updateProjectionMatrix();
+
+    let maxN = 0;
+    for (let j = 0; j < ns.length; j++) {
+      v.copy(ns[j].__threeObj.position).project(cam);
+      if (v.z > 1) continue;
+      const ax = Math.abs(v.x), ay = Math.abs(v.y);
+      if (ax > maxN) maxN = ax;
+      if (ay > maxN) maxN = ay;
+    }
+    if (maxN < 0.001) break;
+    dist = Math.max(120, dist * maxN / 0.86);
+  }
 
   KB.graph.cameraPosition(
     { x: cx + ux * dist, y: cy + uy * dist, z: cz + uz * dist },
     { x: cx, y: cy, z: cz },
-    KB.reduceMotion ? 0 : 1000
+    KB.reduceMotion ? 0 : (ms == null ? 800 : ms)
   );
+};
+
+KB.fitView = function () {
+  KB.fitNodes(KB.NODES, 800);
+};
+
+/* 方向模式：只框住这一串节点 */
+KB.fitSubset = function (ids) {
+  KB.fitNodes(ids.map(id => KB.byId[id]).filter(Boolean), 1000);
 };
 
 KB.setCursor = function (c) {
