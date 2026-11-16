@@ -86,7 +86,8 @@ KB.initGraph = function () {
     .distance(l => l.learn ? 40 : (KB.sameLayerLink(l) ? 62 : 112))
     .strength(l => l.learn ? 0 : 0.45);   // 学习路径不参与布局
 
-  g.d3AlphaDecay(0.02).warmupTicks(80).cooldownTicks(260);
+  /* 收敛得快一点，首屏不用等太久就能开始点 */
+  g.d3AlphaDecay(0.024).warmupTicks(60).cooldownTicks(180);
 
   /* 初始用斜视角，否则 11 层会压成一条竖线 */
   g.cameraPosition({ x: 620, y: 300, z: 880 }, { x: 0, y: 0, z: 0 }, 0);
