@@ -46,15 +46,26 @@ KB.handleEngineStop = function () {
   KB.fitView();
 };
 
+/* 每个知识点都有自己的地址：#/redis，可以直接分享或刷新回到这一页 */
+KB.syncHash = function (id) {
+  const n = id ? KB.byId[id] : null;
+  const hash = n ? '#/' + id : '#';
+  if (location.hash !== hash) {
+    try { history.replaceState(null, '', hash); } catch (e) { location.hash = hash; }
+  }
+  document.title = n ? `${n.name} · 计算机知识体系` : '计算机知识体系 · 3D 交互图谱';
+};
+
 KB.selectNode = function (id, fly) {
   const n = KB.byId[id];
   if (!n) return;
   if (KB.state.focus && !KB.inFocusSet(id)) KB.state.focus = null;
   KB.state.selected = id;
-  if (fly) KB.flyTo(n);
+  if (fly) KB.orbitTo(n);
   KB.renderPanel(id);
   KB.updateFocusBadge();
   KB.refreshStyles();
+  KB.syncHash(id);
 };
 
 KB.clearSelection = function () {
@@ -63,13 +74,14 @@ KB.clearSelection = function () {
   KB.closePanel();
   KB.updateFocusBadge();
   KB.refreshStyles();
+  KB.syncHash(null);
 };
 
 KB.toggleFocus = function (id) {
   KB.state.focus = (KB.state.focus === id) ? null : id;
   KB.state.selected = id;
   const n = KB.byId[id];
-  if (n) KB.flyTo(n, 900);
+  if (n) KB.orbitTo(n, 900);
   KB.renderPanel(id);
   KB.updateFocusBadge();
   KB.refreshStyles();

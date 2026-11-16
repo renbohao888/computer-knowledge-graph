@@ -71,6 +71,28 @@ KB.renderPanel = function (id) {
 
   const st = KB.effStatus(n);
   const color = KB.STATUS_COLOR[st] || '#9fb3cc';
+  const article = (KB.ARTICLES || {})[id];
+  const wanted = KB.state.panelTab || 'overview';
+  const tab = (wanted === 'article' && !article) ? 'overview' : wanted;
+
+  const overview = `
+    <p class="p-desc">${KB.esc(n.description)}</p>
+    <p class="p-layerdef">${KB.esc(KB.LAYER_INFO[n.layer] || '')}</p>
+    ${children ? `<div class="p-group">
+      <div class="p-group-title"><span>细分知识点</span><em>可以继续拆下去</em><b>${n.children.length}</b></div>
+      <div class="p-children">${children}</div>
+    </div>` : ''}
+    ${group('前置知识', '先懂这些', preIds, '这张图里的地基，没有更低层的前置节点。', relOf)}
+    ${group('学完之后', '这些以它为前置', afterIds, '', relOf)}
+    ${group('其他关联', '架构上的直接相连', related, '', relOf)}
+    <button class="p-focus" data-focus>${KB.state.focus === id ? '退出邻域聚焦' : '聚焦这个邻域'}</button>
+  `;
+
+  const articleHtml = article
+    ? renderArticle(article)
+    : `<div class="a-empty">这篇教程还在写。<br>欢迎在 <b>src/data/articles.js</b> 里补上：是什么、为什么、核心概念、示例和常见坑。</div>
+       <button class="p-focus" data-focus>${KB.state.focus === id ? '退出邻域聚焦' : '聚焦这个邻域'}</button>`;
+
   panel.innerHTML = `
     <button class="panel-close" data-close aria-label="关闭详情">✕</button>
     ${KB.state.track ? `<button class="p-back" data-backtrack>← ${KB.esc(KB.state.track)} 方向</button>` : ''}
@@ -91,24 +113,34 @@ KB.renderPanel = function (id) {
       ${KB.STATUS_LIST.map(s => `<button class="p-prog${st === s ? ' active' : ''}" data-progress="${KB.esc(s)}" style="--c:${KB.STATUS_COLOR[s]}">${KB.esc(s)}</button>`).join('')}
       ${KB.hasProgress(n) ? `<em>作者标注 ${KB.esc(n.status)}</em>` : ''}
     </div>
-    <p class="p-desc">${KB.esc(n.description)}</p>
-    <p class="p-layerdef">${KB.esc(KB.LAYER_INFO[n.layer] || '')}</p>
-    ${children ? `<div class="p-group">
-      <div class="p-group-title"><span>细分知识点</span><em>可以继续拆下去</em><b>${n.children.length}</b></div>
-      <div class="p-children">${children}</div>
-    </div>` : ''}
-    ${group('前置知识', '先懂这些', preIds, '这张图里的地基，没有更低层的前置节点。', relOf)}
-    ${group('学完之后', '这些以它为前置', afterIds, '', relOf)}
-    ${group('其他关联', '架构上的直接相连', related, '', relOf)}
-    <button class="p-focus" data-focus>${KB.state.focus === id ? '退出邻域聚焦' : '聚焦这个邻域'}</button>
+    <div class="p-tabs">
+      <button class="p-tab${tab === 'overview' ? ' active' : ''}" data-tab="overview">概览</button>
+      <button class="p-tab${tab === 'article' ? ' active' : ''}" data-tab="article">教程${article ? '' : ' · 待补'}</button>
+    </div>
+    <div class="p-tab-body">${tab === 'article' ? articleHtml : overview}</div>
   `;
   panel.classList.add('open');
+  panel.scrollTop = 0;
 
-  if (hitChild) {
+  if (hitChild && tab !== 'article') {
     const el = panel.querySelector('.child.is-hit');
     if (el) el.scrollIntoView({ block: 'center' });
   }
 };
+
+/* 教程正文：一个块里可以同时有标题、段落、列表、代码，按出现顺序拼接 */
+function renderArticle(blocks) {
+  return (blocks || []).map(b => {
+    let out = '';
+    if (b.h) out += `<h3 class="a-h">${KB.esc(b.h)}</h3>`;
+    if (b.p) out += `<p class="a-p">${KB.esc(b.p)}</p>`;
+    if (b.ul) out += `<ul class="a-ul">${b.ul.map(x => `<li>${KB.esc(x)}</li>`).join('')}</ul>`;
+    if (b.code) out += `<pre class="a-pre"><code>${KB.esc(b.code)}</code></pre>`;
+    if (b.tip) out += `<div class="a-tip">${KB.esc(b.tip)}</div>`;
+    if (b.links) out += `<div class="a-links">${b.links.map(l => `<a href="${KB.esc(l.u)}" target="_blank" rel="noopener">${KB.esc(l.t)}</a>`).join('')}</div>`;
+    return out;
+  }).join('');
+}
 
 /* 方向概览面板 */
 KB.renderTrackPanel = function (name) {
@@ -171,6 +203,8 @@ KB.bindPanel = function () {
     if (go) { KB.selectNode(go.dataset.goto, true); return; }
     const pr = e.target.closest('[data-progress]');
     if (pr) { KB.setProgress(KB.state.selected, pr.dataset.progress); return; }
+    const tb = e.target.closest('[data-tab]');
+    if (tb) { KB.state.panelTab = tb.dataset.tab; KB.renderPanel(KB.state.selected); return; }
     if (e.target.closest('[data-focus]')) { KB.toggleFocus(KB.state.selected); return; }
     if (e.target.closest('[data-backtrack]')) { if (KB.state.track) KB.renderTrackPanel(KB.state.track); return; }
     if (e.target.closest('[data-clear-track]')) { KB.selectTrack(KB.state.track); return; }

@@ -68,7 +68,8 @@ KB.state = {
   hover: null,
   hoverLink: null,
   labels: true,
-  relations: true
+  relations: true,
+  panelTab: 'overview'   // 详情页当前标签：overview / article
 };
 
 /* 派生数据（由 store.js 填充） */

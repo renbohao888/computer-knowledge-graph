@@ -148,7 +148,7 @@ KB.chooseSearch = function (id, child) {
   document.getElementById('searchResults').classList.remove('show');
   document.getElementById('searchInput').blur();
   KB.selectNode(id, false);
-  KB.flyToSearch(n);
+  KB.orbitTo(n, 1250);
 };
 
 KB.bindSearch = function () {

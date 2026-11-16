@@ -72,6 +72,26 @@ KB.boot = function () {
 
   requestAnimationFrame(frame);
 
+  /* 用户一拖鼠标就放弃当前的轨道动画，别跟手动操作打架 */
+  const canvas = document.querySelector('#graph canvas');
+  if (canvas) {
+    canvas.addEventListener('pointerdown', () => { KB._orbitCancel = true; }, { passive: true });
+  }
+
+  /* 直接打开 #/redis 这样的地址，自动进入那个知识点的详情页 */
+  const fromHash = () => {
+    const m = location.hash.match(/^#\/(.+)$/);
+    if (m && KB.byId[m[1]]) return m[1];
+    return null;
+  };
+  const initial = fromHash();
+  if (initial) setTimeout(() => KB.selectNode(initial, true), 1600);
+  window.addEventListener('hashchange', () => {
+    const id = fromHash();
+    if (id) { if (KB.state.selected !== id) KB.selectNode(id, true); }
+    else if (KB.state.selected) KB.clearSelection();
+  });
+
   /* 调试 / 二次开发入口 */
   window.__graph = KB.graph;
   window.__app = KB;

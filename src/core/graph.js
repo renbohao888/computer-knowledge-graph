@@ -21,7 +21,23 @@ KB.colorOfNode = function (n) {
     return KB.fade(KB.TRACKS[s.track].color, t != null ? t : 0.2);
   }
   const base = KB.STATUS_COLOR[KB.effStatus(n)] || '#9fb3cc';
-  if (s.focus && !KB.inFocusSet(n.id)) return KB.fade(base, 0.84);
+
+  if (s.focus) {
+    if (!KB.inFocusSet(n.id)) return KB.fade(base, 0.86);
+    if (!KB.matches(n)) return KB.fade(base, 0.6);
+    return base;
+  }
+
+  /* 选中一个节点：它自己全亮，直接相连的"前后置"稍微暗一点，其余压下去。
+     这样旋转到某个模块时，周围就是它的关系网。 */
+  if (s.selected) {
+    if (n.id === s.selected) return base;
+    const nb = KB.neighborMap.get(s.selected) || [];
+    if (nb.some(e => e.id === n.id)) return KB.fade(base, 0.2);
+    if (!KB.matches(n)) return KB.fade(base, 0.86);
+    return KB.fade(base, 0.78);
+  }
+
   if (!KB.matches(n)) return KB.fade(base, 0.74);
   return base;
 };
@@ -38,6 +54,7 @@ KB.colorOfLink = function (l) {
     return KB.fade(KB.LINK_BASE, 0.9);
   }
   if (KB.state.focus && !(KB.inFocusSet(s) && KB.inFocusSet(t))) return KB.fade(KB.LINK_BASE, 0.86);
+  if (KB.state.selected && !KB.isHotLink(l)) return KB.fade(KB.LINK_BASE, 0.82);
   if (!KB.matches(a) || !KB.matches(b)) return KB.fade(KB.LINK_BASE, 0.8);
   return KB.fade(KB.LINK_BASE, 0.42);
 };
@@ -53,6 +70,7 @@ KB.particleCount = function (l) {
     return KB.isHotLink(l) ? 4 : 1;
   }
   if (KB.state.focus && !(KB.inFocusSet(s) && KB.inFocusSet(t))) return 0;
+  if (KB.state.selected && !KB.isHotLink(l)) return 0;
   if (!KB.matches(KB.byId[s]) || !KB.matches(KB.byId[t])) return 0;
   return KB.isHotLink(l) ? 4 : 1;
 };
@@ -89,7 +107,7 @@ KB.initGraph = function () {
   /* 把节点往 z=0 拉，让每一层尽量落在同一个深度平面上。
      否则斜视角下层与层会互相穿插，刻度也对不齐。 */
   const forceZ = (alpha) => {
-    const k = 0.35 * alpha;
+    const k = 0.22 * alpha;
     for (let i = 0; i < KB.NODES.length; i++) {
       KB.NODES[i].vz += (0 - KB.NODES[i].z) * k;
     }
@@ -99,8 +117,9 @@ KB.initGraph = function () {
 
   g.d3AlphaDecay(0.02).warmupTicks(80).cooldownTicks(240);
 
-  /* 低俯角 + 一点方位角：层带清晰，同时保留景深，不会压成一条竖线 */
-  g.cameraPosition({ x: 0, y: 140, z: 1280 }, { x: 0, y: 0, z: 0 }, 0);
+  /* 偏广一点的视角 + 斜方位，透视更强，模型看起来才有立体感 */
+  if (g.camera()) { g.camera().fov = 55; g.camera().updateProjectionMatrix(); }
+  g.cameraPosition({ x: 480, y: 320, z: 1300 }, { x: 0, y: 0, z: 0 }, 0);
 
   KB.graph = g;
   g.graphData({ nodes: KB.NODES, links: KB.graphLinks });
@@ -129,7 +148,81 @@ KB.clearHover = function () {
   KB.hideTip();
 };
 
-/* 飞向节点：沿当前视角方向推进，方位感不变 */
+/* 绕节点做轨道旋转：方位角转到正面、抬高一点俯角，同时拉近。
+   视觉上就是整个立体模型转过来，把这个模块转到你面前。 */
+KB.orbitTo = function (node, ms) {
+  if (!KB.graph || !node) return;
+  const cam = KB.graph.camera();
+  if (!cam) return;
+  KB.clearHover();
+  KB._orbitCancel = false;
+
+  const st = KB.graph.cameraPosition();
+  const r0 = Math.hypot(st.x - node.x, st.y - node.y, st.z - node.z) || 800;
+  const a0 = Math.atan2(st.x - node.x, st.z - node.z);
+  const e0 = Math.asin(Math.max(-1, Math.min(1, (st.y - node.y) / r0)));
+
+  /* 距离由"节点 + 直接邻居"的包围半径决定：
+     转过去时，前后置知识点刚好围在它周围，而不是只剩它自己 */
+  const nb = KB.neighborMap.get(node.id) || [];
+  let reach = 60;
+  for (const e of nb) {
+    const m = KB.byId[e.id];
+    if (m && typeof m.x === 'number') {
+      reach = Math.max(reach, Math.hypot(m.x - node.x, m.y - node.y, m.z - node.z));
+    }
+  }
+  const fov = ((cam && cam.fov) || 50) * Math.PI / 180;
+  const r1 = Math.max(380, Math.min(1250, reach * 1.15 / Math.tan(fov / 2)));
+  const a1 = 0.35;     // 3/4 视角，不是正对，保留立体感
+  const e1 = 0.30;     // 略微俯视
+
+  let da = a1 - a0;
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+
+  const dur = KB.reduceMotion ? 0 : (ms || 1050);
+  /* 走库自己的 cameraPosition：它会同时同步 controls 的注视点。
+     直接改 camera.position 而不动 controls，镜头会指偏。 */
+  const place = (a, e, r) => {
+    const px = node.x + Math.sin(a) * Math.cos(e) * r;
+    const py = node.y + Math.sin(e) * r;
+    const pz = node.z + Math.cos(a) * Math.cos(e) * r;
+
+    /* 面板打开时，把节点放到"可用区域"的中心而不是整屏中心，
+       否则右侧的邻居会被面板挡住 */
+    let fx = node.x - px, fy = node.y - py, fz = node.z - pz;
+    const fl = Math.hypot(fx, fy, fz) || 1;
+    fx /= fl; fy /= fl; fz /= fl;
+    const rx = -fz, rz = fx;               // right = cross(forward, up)
+
+    const panelEl = document.getElementById('panel');
+    const panelOpen = panelEl && panelEl.classList.contains('open') && window.innerWidth > 900;
+    const panelW = panelOpen ? 480 : 0;
+    const worldPerPx = (2 * Math.tan(fov / 2) * r) / window.innerHeight;
+    const shift = (panelW / 2) * worldPerPx;
+
+    KB.graph.cameraPosition(
+      { x: px, y: py, z: pz },
+      { x: node.x + rx * shift, y: node.y, z: node.z + rz * shift },
+      0
+    );
+  };
+
+  if (!dur) { place(a1, e1, r1); return; }
+
+  const t0 = performance.now();
+  const step = () => {
+    if (KB._orbitCancel) return;
+    const t = Math.min(1, (performance.now() - t0) / dur);
+    const k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;  // easeInOutQuad
+    place(a0 + da * k, e0 + (e1 - e0) * k, r0 + (r1 - r0) * k);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
+
+/* 沿当前视角推进（备用：需要保持方位时用） */
 KB.flyTo = function (node, ms) {
   if (!KB.graph || !node) return;
   KB.clearHover();
