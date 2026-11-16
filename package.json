@@ -1,0 +1,15 @@
+{
+  "name": "computer-knowledge-graph",
+  "version": "2.0.0",
+  "private": true,
+  "description": "计算机知识体系 3D 交互图谱：分层 + 学习方向 + 前置关系，零依赖单页应用",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "validate": "node scripts/validate.mjs",
+    "db": "node scripts/build-db.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

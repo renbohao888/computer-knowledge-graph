@@ -1,0 +1,8 @@
+services:
+  knowledge-graph:
+    build: .
+    image: computer-knowledge-graph:latest
+    container_name: computer-knowledge-graph
+    ports:
+      - "8787:80"
+    restart: unless-stopped

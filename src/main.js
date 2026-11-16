@@ -1,0 +1,95 @@
+/* ============================================================
+ * 启动：加载 3d-force-graph → 装配 → 渲染循环
+ * ============================================================ */
+window.KB = window.KB || {};
+
+const CDNS = [
+  'https://unpkg.com/3d-force-graph@1.80.2/dist/3d-force-graph.min.js',
+  'https://registry.npmmirror.com/3d-force-graph/1.80.2/files/dist/3d-force-graph.min.js',
+  'https://cdn.jsdelivr.net/npm/3d-force-graph@1.80.2/dist/3d-force-graph.min.js'
+];
+
+function loadScript(src, timeout) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    let done = false;
+    const timer = setTimeout(() => { if (!done) { done = true; reject(new Error('timeout')); } }, timeout || 12000);
+    s.src = src;
+    s.async = true;
+    s.onload = () => { if (!done) { done = true; clearTimeout(timer); resolve(); } };
+    s.onerror = () => { if (!done) { done = true; clearTimeout(timer); reject(new Error('load error')); } };
+    document.head.appendChild(s);
+  });
+}
+
+async function loadLib() {
+  for (const url of CDNS) {
+    if (window.ForceGraph3D) return true;
+    try { await loadScript(url); } catch (e) { /* 换下一个源 */ }
+  }
+  return !!window.ForceGraph3D;
+}
+
+function showBootError() {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  boot.classList.add('boot-error');
+  boot.querySelector('.boot-card').innerHTML = `
+    <p>3D 引擎加载失败</p>
+    <small>页面需要联网从 CDN 取 3d-force-graph。网络恢复后刷新即可；
+    也可以把库下载到本地，改 main.js 里的 CDNS 指向本地文件。</small>
+    ${CDNS.map(u => `<code>${KB.esc(u)}</code>`).join('')}
+  `;
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (!KB.graph) return;
+  const cam = KB.graph.camera();
+  if (!cam) return;
+  KB.updateAxis(cam);
+  KB.tickLabels(cam);
+}
+
+KB.boot = function () {
+  if (KB.booted) return;
+  KB.booted = true;
+
+  KB.buildIndex();
+  KB.prepareLinks();
+
+  KB.buildRailUI();
+  KB.buildDomainOptions();
+  KB.bindTooltip();
+  KB.bindPanel();
+  KB.bindSearch();
+  KB.bindRail();
+
+  KB.initGraph();
+  KB.buildLabels();
+  KB.buildAxis();
+  KB.updateMatchStat();
+
+  requestAnimationFrame(frame);
+
+  /* 调试 / 二次开发入口 */
+  window.__graph = KB.graph;
+  window.__app = KB;
+  window.updateGraphData = KB.updateGraphData;
+
+  const boot = document.getElementById('boot');
+  if (boot) {
+    boot.classList.add('hide');
+    setTimeout(() => { if (boot.parentNode) boot.remove(); }, 600);
+  }
+};
+
+(async function start() {
+  const ok = await loadLib();
+  if (!ok) { showBootError(); return; }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', KB.boot, { once: true });
+  } else {
+    KB.boot();
+  }
+})();

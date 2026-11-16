@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='10' fill='%235cc8ff'/%3E%3C/svg%3E">
+<title>计算机知识体系 · 3D 交互图谱</title>
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+<div id="graph"></div>
+<div id="atmosphere"></div>
+<div id="vignette"></div>
+<div id="labels"></div>
+<div id="layerAxis"></div>
+
+<!-- 左上：标题 · 方向 · 分层 · 掌握度 -->
+<aside id="rail">
+  <h1>计算机知识体系</h1>
+  <p class="rail-sub"><b id="statNodes">0</b> 个节点 · <b id="statLinks">0</b> 条关系 · 按层吸附</p>
+
+  <div class="rail-section">
+    <div class="rail-title"><span>方向</span><em>选一条路</em></div>
+    <div class="track-grid" id="trackGrid"></div>
+  </div>
+
+  <div class="rail-section">
+    <div class="rail-title"><span>分层</span><em>点击筛选</em></div>
+    <ul id="layerList"></ul>
+  </div>
+
+  <div class="rail-section">
+    <div class="rail-title"><span>掌握度</span><em>点击筛选</em></div>
+    <div id="statusList"></div>
+    <div class="progress"><i id="progressBar"></i></div>
+    <p class="progress-text" id="progressText"></p>
+  </div>
+
+  <div class="rail-foot">
+    拖拽旋转 · 滚轮缩放 · 右键平移<br>
+    单击看详情 · 双击聚焦邻域<br>
+    按 / 搜索并定位知识点<br>
+    球越大，连接的节点越多
+  </div>
+</aside>
+
+<!-- 右上：工具条 -->
+<div id="dock">
+  <div id="searchWrap">
+    <svg class="s-icon" viewBox="0 0 16 16" fill="none" stroke="#8697b3" stroke-width="1.6">
+      <circle cx="7" cy="7" r="4.5"></circle><path d="M10.5 10.5L14 14" stroke-linecap="round"></path>
+    </svg>
+    <input id="searchInput" type="text" placeholder="搜索知识点（/）" autocomplete="off" spellcheck="false" aria-label="搜索知识点">
+    <div id="searchResults" role="listbox"></div>
+  </div>
+  <span id="matchStat">—</span>
+  <label class="field only-mobile"><span>方向</span><select id="trackSelectMobile"></select></label>
+  <label class="field only-mobile"><span>分层</span><select id="layerSelectMobile"></select></label>
+  <label class="field"><span>问题域</span><select id="domainSelect"></select></label>
+  <button class="ghost" id="labelBtn" aria-pressed="true">标签</button>
+  <button class="ghost" id="relBtn" aria-pressed="true">关系</button>
+  <button class="ghost" id="resetBtn">重置</button>
+</div>
+
+<!-- 右侧：详情面板 -->
+<aside id="panel" aria-live="polite"></aside>
+
+<div id="tooltip"></div>
+<div id="focusBadge"></div>
+
+<div id="boot">
+  <div class="boot-card">
+    <div class="boot-spin"></div>
+    <p>正在加载 3D 引擎</p>
+    <small>首次打开需要联网，从 CDN 取 3d-force-graph（约 1.4 MB）</small>
+  </div>
+</div>
+
+<script src="src/config.js"></script>
+<script src="src/data/nodes.js"></script>
+<script src="src/data/links.js"></script>
+<script src="src/core/util.js"></script>
+<script src="src/core/store.js"></script>
+<script src="src/core/graph.js"></script>
+<script src="src/core/actions.js"></script>
+<script src="src/ui/tooltip.js"></script>
+<script src="src/ui/panel.js"></script>
+<script src="src/ui/search.js"></script>
+<script src="src/ui/labels.js"></script>
+<script src="src/ui/rail.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
