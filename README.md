@@ -72,6 +72,8 @@ node scripts/serve.mjs
 
 命中细分知识点时，详情面板会滚到那一条并高亮它，所以"这个点属于哪个模块"一眼就能看到。
 
+![搜索注解定位到 Java](docs/screenshot-panel.png)
+
 ## 交互
 
 | 操作 | 效果 |
