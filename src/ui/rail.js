@@ -174,7 +174,7 @@ KB.bindRail = function () {
     resetBtn.addEventListener('click', () => {
       const s = KB.state;
       s.layer = null; s.domain = null; s.status = null; s.track = null;
-      s.selected = null; s.focus = null;
+      s.selected = null; s.focus = null; s.editing = null;
       KB.twoDExit();
       KB.closePanel();
       KB.updateFocusBadge();
@@ -215,6 +215,7 @@ KB.bindRail = function () {
     if (e.key === 'Escape') {
       KB.state.focus = null;
       KB.state.selected = null;
+      KB.state.editing = null;
       KB.twoDExit();
       KB.closePanel();
       KB.updateFocusBadge();

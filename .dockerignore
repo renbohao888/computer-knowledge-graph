@@ -5,3 +5,4 @@ node_modules
 preview.png
 data/*.db
 *.log
+data

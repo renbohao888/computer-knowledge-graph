@@ -514,3 +514,63 @@ body.labels-off #labels{opacity:0}
   #panel.open{transform:none}
   .node-label{font-size:9.5px}
 }
+
+/* ============================================================
+ * 教程编辑器：详情面板「教程」标签里直接写内容
+ * ============================================================ */
+.ed-wrap{margin-top:2px}
+.ed-bar{font-size:12px;color:var(--muted);margin-bottom:10px}
+.ed-bar b{color:#dff3ff;font-weight:600}
+.ed-add-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.ed-add{
+  font-size:12px;padding:5px 10px;border-radius:8px;color:#bcd2ee;
+  background:rgba(92,200,255,.07);border:1px solid rgba(92,200,255,.25);
+}
+.ed-add:hover{background:rgba(92,200,255,.16);color:#e8f6ff}
+.ed-block{
+  background:rgba(9,16,29,.65);border:1px solid var(--stroke);
+  border-radius:12px;padding:10px 12px;margin-bottom:10px;
+}
+.ed-head{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.ed-head b{font-size:12px;color:#cfe4ff;font-weight:600}
+.ed-head em{font-style:normal;font-size:11px;color:var(--faint)}
+.ed-head .sp{flex:1}
+.ed-btn{
+  width:24px;height:24px;border-radius:6px;font-size:12px;line-height:1;
+  color:var(--muted);background:rgba(124,168,224,.08);border:1px solid var(--stroke);
+}
+.ed-btn:hover{color:#e6f4ff;background:rgba(124,168,224,.18)}
+.ed-del:hover{color:#ff8b94;background:rgba(255,100,112,.12);border-color:rgba(255,100,112,.35)}
+.ed-wrap input[type=text],.ed-wrap textarea{
+  display:block;width:100%;margin:0 0 8px;padding:8px 10px;border-radius:8px;
+  background:rgba(5,10,19,.85);border:1px solid var(--stroke-2);
+  color:var(--text);font:inherit;line-height:1.7;
+}
+.ed-wrap input[type=text]:focus,.ed-wrap textarea:focus{outline:none;border-color:rgba(92,200,255,.55)}
+.ed-wrap textarea{min-height:70px;resize:vertical}
+.ed-wrap .ed-code{
+  font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  font-size:12px;min-height:96px;white-space:pre;
+}
+.ed-wrap .ed-block>*:last-child{margin-bottom:0}
+.ed-empty{padding:14px;border:1px dashed var(--stroke-2);border-radius:12px;color:var(--faint);text-align:center;font-size:12px}
+.ed-hint{font-size:11px;color:var(--faint);margin:4px 0 12px;line-height:1.7}
+.ed-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ed-save{
+  flex:1;min-width:130px;padding:10px 14px;border-radius:10px;font-weight:600;color:#03121f;
+  background:linear-gradient(135deg,#5cc8ff,#3ea7e8);
+}
+.ed-save:hover{filter:brightness(1.08)}
+.ed-cancel{padding:10px 14px;border-radius:10px;color:var(--muted);border:1px solid var(--stroke-2)}
+.ed-cancel:hover{color:#dfeafb;background:rgba(124,168,224,.1)}
+.ed-reset{padding:10px 14px;border-radius:10px;color:#b9a26a;border:1px solid rgba(245,196,83,.25)}
+.ed-reset:hover{background:rgba(245,196,83,.1)}
+.ed-download{margin-top:10px;font-size:12px;color:var(--cyan)}
+.ed-download:hover{text-decoration:underline}
+.a-edit{
+  display:block;width:100%;margin-top:18px;padding:10px 14px;border-radius:10px;
+  color:#bfe6ff;background:rgba(92,200,255,.08);border:1px solid rgba(92,200,255,.28);
+  font-weight:600;
+}
+.a-edit:hover{background:rgba(92,200,255,.16)}
+.a-edit.primary{color:#03121f;background:linear-gradient(135deg,#5cc8ff,#3ea7e8);border:0}

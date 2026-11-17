@@ -58,6 +58,9 @@ KB.boot = function () {
   KB.buildIndex();
   KB.prepareLinks();
 
+  /* 拉取页面内补充过的教程（拿到后会自己重绘面板） */
+  if (KB.loadUserContent) KB.loadUserContent();
+
   KB.buildRailUI();
   KB.buildDomainOptions();
   KB.bindTooltip();

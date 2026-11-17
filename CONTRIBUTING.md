@@ -9,6 +9,32 @@
 
 这些都可以直接提 PR，不需要懂前端。
 
+## 最省事的方式：在页面里直接写
+
+如果部署里带着内容 API（`docker compose up` 或 `npm run serve` 默认都有）：
+
+1. 打开任意知识点，切到「教程」标签
+2. 没有教程就点 **✍ 写这篇教程**，有教程就点 **✏️ 编辑这篇教程**
+3. 按块写：段落、要点列表、代码、提示、链接；每块可上移 / 下移 / 删除
+4. 点 **保存教程**，内容写进服务器的 `data/content.json`，其他人刷新就能看到
+
+全程不碰代码。改坏了点「恢复原版」；上一版内容会自动留在 `data/content.backup.json`。
+
+想把线上补充的内容合进仓库（让没有服务器的人也能看到）：
+
+- 把 `data/content.json` 里的内容按节点 id 搬进 `src/data/articles.js`，或者
+- 直接在 PR 里附上 `data/content.json`，维护者合并即可
+
+内容块的格式只有六种，和 `articles.js` 一样：
+
+```js
+{ h: '小节标题', p: '一段正文' }        // 段落，h 可省略
+{ ul: ['要点', '要点'] }                // 列表
+{ code: '...', lang: 'js' }             // 代码，lang 可省略
+{ tip: '一句话提醒' }                   // 提示
+{ links: [{ t: '显示名', u: 'https://...' }] }  // 链接
+```
+
 ## 数据在哪
 
 | 想改什么 | 改哪个文件 |
@@ -19,6 +45,8 @@
 | AI、数据、数学与算法 | `src/data/nodes-data-ai.js` |
 | 网络、运行时、基础设施、嵌入式、硬件 | `src/data/nodes-systems.js` |
 | 知识点之间的关系 | `src/data/links.js` 或 `links-more.js` |
+| 教程正文（离线补） | `src/data/articles.js` |
+| 页面上写的教程（运行时） | `data/content.json` |
 | 分层、方向、颜色 | `src/config.js` |
 | 页面结构 / 样式 / 交互 | `index.html`、`src/*.js`、`src/styles.css` |
 

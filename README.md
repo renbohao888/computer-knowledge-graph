@@ -39,22 +39,25 @@
 docker compose up --build -d
 ```
 
-打开 <http://localhost:8787>。
+打开 <http://localhost:8787>。整个应用只有一个 Python 容器（只用标准库，没有第三方依赖），
+页面内写的教程保存在宿主机的 `data/content.json`，重建镜像不会丢。
 
 不用 compose 也行：
 
 ```bash
 docker build -t computer-knowledge-graph .
-docker run -d -p 8787:80 --name ckg computer-knowledge-graph
+docker run -d -p 8787:80 -v "$PWD/data:/data" --name ckg computer-knowledge-graph
 ```
 
 ### 本地预览（零依赖）
 
 ```bash
-node scripts/serve.mjs
+node scripts/serve.mjs          # Node 20+，带内容 API
+# 或者
+python3 server/api.py           # Python 3.8+，同时托管页面和 API
 ```
 
-打开 <http://127.0.0.1:8791>。也可以直接双击 `index.html`（首次需要联网从 CDN 取 3d-force-graph）。
+打开 <http://127.0.0.1:8791>（Python 版是 <http://127.0.0.1:8000>）。也可以直接双击 `index.html`（首次需要联网从 CDN 取 3d-force-graph），这种打开方式下教程编辑只能存在本机浏览器。
 
 ## 搜索能细到什么程度
 
@@ -108,7 +111,28 @@ node scripts/serve.mjs
 
 右上角的 ✕、`Esc`、点击空白处都能关闭详情页。
 
-教程正文在 `src/data/articles.js`，按节点 id 组织，目前覆盖 24 个高频节点；没写教程的节点会显示"这篇还在写"，不影响其它功能。
+教程正文在 `src/data/articles.js`，按节点 id 组织，目前覆盖 24 个高频节点；没写教程的节点会显示"待补"，不影响其它功能。
+
+### 直接写教程（不用改代码）
+
+打开任意节点的「教程」标签：
+
+- 没有教程的：点 **✍ 写这篇教程**
+- 有教程的：点 **✏️ 编辑这篇教程**
+
+编辑器按块组织内容：段落（可带小标题）、要点列表、代码（可选语言）、提示、链接。
+每块都能上移、下移、删除；空块保存时自动丢弃。
+
+保存后写进 `data/content.json`，**其他人刷新页面就能看到**，不需要重新构建镜像，
+也不需要会 Git。服务器不可用时会退回"只存本机浏览器"，并提供 JSON 下载。
+
+- 改坏了：编辑页里的「恢复原版」可以删掉你的覆盖，回到仓库里的版本
+- 人工兜底：每次保存前，旧版本会留一份 `data/content.backup.json`
+- 内容格式和 `src/data/articles.js` 完全一致，随时可以搬进代码库
+
+![页面内编辑教程](docs/screenshot-editor.png)
+
+> 内容 API 没有鉴权，适合本机、教室局域网或内网部署。如果要放公网，请在前面加一层登录 / Basic Auth，或者把编辑接口关掉。
 
 ### 我的进度
 
@@ -139,14 +163,26 @@ src/
 │   ├── store.js             索引、匹配、连线流向
 │   ├── graph.js             3D 初始化、样式、相机
 │   ├── progress.js          我的进度（localStorage + 导入导出）
+│   ├── content.js           教程内容读写（服务器优先，失败落本机）
 │   └── actions.js           选中 / 聚焦 / 方向模式 / 替换数据
 ├── ui/
 │   ├── panel.js             详情面板、方向概览
+│   ├── editor.js            页面内教程编辑器（块式）
 │   ├── search.js            搜索（别名 + 子知识点 + 多词）
 │   ├── labels.js            节点名、连线关系、光晕
 │   ├── rail.js              左栏、工具条、筛选同步
 │   └── tooltip.js           悬浮提示
+├── server/
+│   └── api.py               零依赖服务：静态页面 + 内容 API
 └── main.js                  启动与渲染循环
+```
+
+运行时数据（不进镜像，由 `data/` 卷保存）：
+
+```
+data/
+├── content.json             页面上写的教程（服务器保存）
+└── content.backup.json      每次保存前自动留的上一版
 ```
 
 加一个知识点、拆一个知识点、补一条关系，步骤都在 [CONTRIBUTING.md](CONTRIBUTING.md)。提交前跑：
@@ -184,6 +220,7 @@ npm run db     # 生成 data/knowledge.db
 - [x] 分层 / 方向 / 前置后置 / 连线关系文字 / 细分知识点
 - [x] Docker 交付 + 数据校验 + SQLite 导出
 - [x] 详情页（`#/节点id`）+ 教程框架 + 24 篇教程
+- [x] 页面内直接写 / 改教程，内容存 JSON，不用改代码
 - [ ] 把教程补到全部 155 个节点
 - [ ] 节点 3D 模型（GLTF：服务器、数据库、芯片等不同造型）
 - [ ] 邻居跳数 1–3 跳 + 锁定当前节点

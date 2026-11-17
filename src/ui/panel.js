@@ -73,6 +73,7 @@ KB.renderPanel = function (id) {
   const color = KB.STATUS_COLOR[st] || '#9fb3cc';
   const article = (KB.ARTICLES || {})[id];
   const tab = KB.state.panelTab || 'overview';
+  const editing = KB.state.editing && KB.state.editing.id === id;
 
   const overview = `
     <p class="p-desc">${KB.esc(n.description)}</p>
@@ -87,10 +88,12 @@ KB.renderPanel = function (id) {
     <button class="p-focus" data-focus>${KB.state.focus === id ? '退出邻域聚焦' : '聚焦这个邻域'}</button>
   `;
 
-  const articleHtml = article
-    ? renderArticle(article)
-    : `<div class="a-empty">这篇教程还在写。<br>欢迎在 <b>src/data/articles.js</b> 里补上：是什么、为什么、核心概念、示例和常见坑。</div>
-       <button class="p-focus" data-focus>${KB.state.focus === id ? '退出邻域聚焦' : '聚焦这个邻域'}</button>`;
+  const articleHtml = editing
+    ? KB.renderEditor()
+    : article
+      ? renderArticle(article) + `<button class="a-edit" data-edit-article>✏️ 编辑这篇教程</button>`
+      : `<div class="a-empty">这篇教程还在写。你可以直接在这里补上：是什么、为什么重要、核心概念、示例、常见坑。保存后其他人刷新就能看到。</div>
+         <button class="a-edit primary" data-edit-article>✍ 写这篇教程</button>`;
 
   panel.innerHTML = `
     <button class="panel-close" data-close aria-label="关闭详情">✕</button>
@@ -114,7 +117,7 @@ KB.renderPanel = function (id) {
     </div>
     <div class="p-tabs">
       <button class="p-tab${tab === 'overview' ? ' active' : ''}" data-tab="overview">概览</button>
-      <button class="p-tab${tab === 'article' ? ' active' : ''}" data-tab="article">教程${article ? '' : ' · 待补'}</button>
+      <button class="p-tab${tab === 'article' ? ' active' : ''}" data-tab="article">教程${editing ? ' · 编辑中' : article ? '' : ' · 待补'}</button>
     </div>
     <div class="p-tab-body">${tab === 'article' ? articleHtml : overview}</div>
   `;
@@ -198,15 +201,35 @@ KB.renderPanelIfOpen = function () {
 
 KB.bindPanel = function () {
   KB.getPanel().addEventListener('click', (e) => {
+    /* 任何会重绘面板的点击之前，先把编辑器里正在输入的内容收回状态 */
+    if (KB.state.editing && KB.editorSync) KB.editorSync();
+
     const go = e.target.closest('[data-goto]');
     if (go) { KB.selectNode(go.dataset.goto, true); return; }
     const pr = e.target.closest('[data-progress]');
     if (pr) { KB.setProgress(KB.state.selected, pr.dataset.progress); return; }
     const tb = e.target.closest('[data-tab]');
     if (tb) { KB.state.panelTab = tb.dataset.tab; KB.renderPanel(KB.state.selected); return; }
+    /* 编辑器的按钮在下面统一处理 */
     if (e.target.closest('[data-focus]')) { KB.toggleFocus(KB.state.selected); return; }
     if (e.target.closest('[data-backtrack]')) { if (KB.state.track) KB.renderTrackPanel(KB.state.track); return; }
     if (e.target.closest('[data-clear-track]')) { KB.selectTrack(KB.state.track); return; }
-    if (e.target.closest('[data-close]')) { KB.clearSelection(); }
+    if (e.target.closest('[data-edit-article]')) { KB.startEditArticle(KB.state.selected); return; }
+    const edAdd = e.target.closest('[data-ed-add]');
+    if (edAdd) { KB.editorAdd(edAdd.dataset.edAdd); return; }
+    const edDel = e.target.closest('[data-ed-del]');
+    if (edDel) { KB.editorRemove(Number(edDel.closest('.ed-block').dataset.i)); return; }
+    const edMove = e.target.closest('[data-ed-move]');
+    if (edMove) { KB.editorMove(Number(edMove.closest('.ed-block').dataset.i), Number(edMove.dataset.edMove)); return; }
+    if (e.target.closest('[data-ed-save]')) { KB.saveEditing(); return; }
+    if (e.target.closest('[data-ed-cancel]')) { KB.cancelEditing(); return; }
+    if (e.target.closest('[data-ed-reset]')) {
+      const id = KB.state.editing && KB.state.editing.id;
+      KB.state.editing = null;
+      if (id) KB.resetUserArticle(id);
+      return;
+    }
+    if (e.target.closest('[data-ed-download]')) { KB.downloadUserContent(); return; }
+    if (e.target.closest('[data-close]')) { KB.state.editing = null; KB.clearSelection(); }
   });
 };

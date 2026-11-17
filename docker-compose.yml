@@ -5,4 +5,7 @@ services:
     container_name: computer-knowledge-graph
     ports:
       - "8787:80"
+    volumes:
+      # 页面里写/改的教程存到这里，重建镜像不会丢
+      - ./data:/data
     restart: unless-stopped

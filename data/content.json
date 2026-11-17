@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "articles": {
+    "graphics": [
+      {
+        "h": "是什么",
+        "p": "把三维场景画到屏幕上：建模、光栅化、光照、着色器。游戏引擎和 CAD 都以它为基础。"
+      },
+      {
+        "ul": [
+          "光栅化：把三角形变成像素",
+          "光线追踪：从相机往回追光线",
+          "着色器：控制每个像素怎么算"
+        ]
+      },
+      {
+        "code": "const renderer = new WebGLRenderer();\nrenderer.render(scene, camera);",
+        "lang": "js"
+      },
+      {
+        "links": [
+          {
+            "t": "LearnOpenGL",
+            "u": "https://learnopengl.com"
+          },
+          {
+            "t": "WebGL 规范",
+            "u": "https://registry.khronos.org/webgl/"
+          }
+        ]
+      }
+    ]
+  },
+  "updatedAt": "2026-11-17T04:26:05Z"
+}

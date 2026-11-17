@@ -109,6 +109,8 @@ KB.syncHash = function (id) {
 KB.selectNode = function (id, fly) {
   const n = KB.byId[id];
   if (!n) return;
+  /* 切走之前把编辑器里没保存的输入收回内存，切回来还能接着写 */
+  if (KB.state.editing && KB.editorSync) KB.editorSync();
   if (KB.state.focus && !KB.inFocusSet(id)) KB.state.focus = null;
   KB.state.selected = id;
   /* 点击节点：摊平成 2D 关系图（前置/后续/关联环绕） */
@@ -122,6 +124,7 @@ KB.selectNode = function (id, fly) {
 KB.clearSelection = function () {
   KB.state.selected = null;
   KB.state.focus = null;
+  KB.state.editing = null;
   KB.closePanel();
   KB.updateFocusBadge();
   KB.twoDExit();
