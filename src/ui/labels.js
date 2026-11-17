@@ -16,8 +16,10 @@ function rgba(hex, a) {
   const n = parseInt(h, 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
-const edgeEls = [];        // 与 KB.graphLinks 中非 learn 连线一一对应
+const edgeEls = [];        // 与 dataLinks 中非 learn 连线一一对应
 const boxes = [];          // 本帧已占用的矩形
+let dataNodes = null;      // 当前渲染的节点集（总图 / 节点内部共用这套标签）
+let dataLinks = null;
 let nodeVec = null;
 let edgeVec = null;
 
@@ -26,7 +28,9 @@ const EDGE_FAR = 10;
 const EDGE_NEAR = 24;
 const EDGE_MIN_LEN = 70;
 
-KB.buildLabels = function () {
+KB.buildLabels = function (nodes, links) {
+  dataNodes = nodes || KB.NODES;
+  dataLinks = links || KB.graphLinks;
   const layer = document.getElementById('labels');
   layer.innerHTML = '';
   nodeEls.clear();
@@ -34,10 +38,12 @@ KB.buildLabels = function () {
 
   /* 先放光晕，再放文字，光晕在底层 */
   haloEls.clear();
-  KB.NODES.forEach(n => {
+  dataNodes.forEach(n => {
     const halo = document.createElement('div');
     halo.className = 'node-halo';
-    const c = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+    const c = n._sub
+      ? KB.subColorOf(n._idx, KB._subCount || 1, KB._subGroups || 1)
+      : (KB.STATUS_COLOR[n.status] || '#9fb3cc');
     halo.style.background = `radial-gradient(circle, ${rgba(c, 0.55)} 0%, ${rgba(c, 0.18)} 42%, ${rgba(c, 0)} 70%)`;
     const size = 34 + Math.min(n._deg || 0, 8) * 4;
     halo.style.width = size + 'px';
@@ -46,7 +52,7 @@ KB.buildLabels = function () {
     haloEls.set(n.id, halo);
   });
 
-  KB.NODES.forEach(n => {
+  dataNodes.forEach(n => {
     const el = document.createElement('div');
     el.className = 'node-label';
     el.textContent = n.name;
@@ -57,7 +63,7 @@ KB.buildLabels = function () {
 
   /* 每条架构连线一个标签元素（学习路径不标，避免噪音） */
   edgeEls.length = 0;
-  KB.graphLinks.forEach(l => {
+  dataLinks.forEach(l => {
     if (l.learn) { edgeEls.push(null); return; }
     const el = document.createElement('div');
     el.className = 'edge-label';
@@ -73,7 +79,7 @@ KB.buildLabels = function () {
 
   /* 文本宽度只需量一次 */
   requestAnimationFrame(() => {
-    KB.NODES.forEach(n => {
+    dataNodes.forEach(n => {
       const el = nodeEls.get(n.id);
       if (el) nodeW.set(n.id, el.offsetWidth || n.name.length * 11);
     });
@@ -134,8 +140,9 @@ KB.tickLabels = function (cam) {
   /* ---------- 节点名 ---------- */
   if (st.labels) {
     const items = [];
-    for (let i = 0; i < KB.NODES.length; i++) {
-      const n = KB.NODES[i];
+    const nodes = dataNodes || KB.NODES;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
       const el = nodeEls.get(n.id);
       if (!el) continue;
       const obj = n.__threeObj;
@@ -150,7 +157,12 @@ KB.tickLabels = function (cam) {
       }
 
       let prio = 1, op = 0.68, hOp = 0.45, hScale = 1;
-      if (st.selected === n.id || st.hover === n.id) { prio = 4; op = 1; hOp = 1; hScale = st.selected === n.id ? 1.7 : 1.25; }
+      if (st.subOf) {
+        /* 节点内部模式：子知识点都亮着；分区名（锚点）中等亮度且优先显示 */
+        if (n._anchor) { prio = 3; op = 0.8; hOp = 0; }
+        else if (st.hover === n.id) { prio = 4; op = 1; hOp = 1; hScale = 1.15; }
+        else { prio = 1; op = 0.9; hOp = 0.4; }
+      } else if (st.selected === n.id || st.hover === n.id) { prio = 4; op = 1; hOp = 1; hScale = st.selected === n.id ? 1.7 : 1.25; }
       else if (st.focus && KB.inFocusSet(n.id)) { prio = 2; op = 0.9; hOp = 0.85; }
       else if (st.focus) { prio = 0; op = 0.1; hOp = 0.08; }
       else if (st.selected) {
@@ -158,6 +170,11 @@ KB.tickLabels = function (cam) {
         if (nb.some(e => e.id === n.id)) { prio = 3; op = 0.95; hOp = 0.8; hScale = 1.15; }
         else { prio = 0; op = 0.32; hOp = 0.12; }
       }
+      else if (st.path) {
+        if (KB._pathSet && KB._pathSet.has(n.id)) { prio = 2.5; op = 0.96; hOp = 0.7; }
+        else { prio = 0; op = 0.08; hOp = 0.03; }
+      }
+      else if (st.track && !n.tracks.includes(st.track)) { prio = 0; op = 0.14; hOp = 0.04; }
       else if (!KB.matches(n)) { prio = 0; op = 0.16; hOp = 0.08; }
 
       if (halo) {
@@ -186,7 +203,16 @@ KB.tickLabels = function (cam) {
         it.el.style.transform = `translate3d(${it.x.toFixed(1)}px,${it.y.toFixed(1)}px,0) translate(-50%,-50%)`;
         it.el.classList.toggle('is-hot', it.hot);
 
-        const halfW = (nodeW.get(it.n.id) || it.n.name.length * 11) / 2 + 8;
+        /* 学习路线模式：节点名前面带上它在路线里的步骤序号 */
+        const stepNo = st.path && KB._pathIdx ? KB._pathIdx.get(it.n.id)
+          : ((st.subOf && it.n._step) ? it.n._step : 0);
+        const text = stepNo ? stepNo + '. ' + it.n.name : it.n.name;
+        if (it.el.textContent !== text) {
+          it.el.textContent = text;
+          nodeW.set(it.n.id, it.el.offsetWidth || text.length * 11);
+        }
+
+        const halfW = ((nodeW.get(it.n.id) || it.n.name.length * 11) / 2) + 8;
         const box = { x1: it.x - halfW, x2: it.x + halfW, y1: it.y - 11, y2: it.y + 11 };
         if (overlaps(box)) { it.el.style.opacity = '0'; continue; }
         boxes.push(box);
@@ -201,14 +227,23 @@ KB.tickLabels = function (cam) {
   if (KB._orbiting) return;   // 轨道动画期间由 CSS 隐藏，跳过整段计算
   const showEdges = st.relations;
   const cands = [];
-  for (let i = 0; i < KB.graphLinks.length; i++) {
+  const links = dataLinks || KB.graphLinks;
+  const byId = st.subOf ? (KB.subById || Object.create(null)) : KB.byId;
+  for (let i = 0; i < links.length; i++) {
     const el = edgeEls[i];
     if (!el) continue;
-    if (!showEdges) { el.style.opacity = '0'; continue; }
+    if (!showEdges || st.subOf) { el.style.opacity = '0'; continue; }
 
-    const l = KB.graphLinks[i];
-    const a = KB.byId[KB.idOf(l.source)], b = KB.byId[KB.idOf(l.target)];
+    const l = links[i];
+    const a = byId[KB.idOf(l.source)], b = byId[KB.idOf(l.target)];
     if (!a || !b) { el.style.opacity = '0'; continue; }
+    /* 路线模式下关系文字会让链路太乱，全部收起 */
+    if (st.path) { el.style.opacity = '0'; continue; }
+    /* 方向模式下，只给两端都在这个方向的连线写关系文字 */
+    if (st.track && !(a.tracks.includes(st.track) && b.tracks.includes(st.track))) {
+      el.style.opacity = '0';
+      continue;
+    }
 
     const mx = ((a.x || 0) + (b.x || 0)) / 2;
     const my = ((a.y || 0) + (b.y || 0)) / 2;

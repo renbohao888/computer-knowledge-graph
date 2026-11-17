@@ -14,7 +14,9 @@ window.KB = window.KB || {};
   const view = { x: 0, y: 0, k: 1 };
   let svg, vp, gEdges, gNodes;
   let raf = 0;
+  let exitTimer = 0;
   let drag = null;
+  let hoverId = null;
   let focusIds = new Set();
   let labelAbove = new Map();
 
@@ -83,8 +85,11 @@ window.KB = window.KB || {};
   function layoutFocus(id) {
     const W = window.innerWidth, H = window.innerHeight;
     const narrow = W <= 900;
-    const railW = narrow ? 0 : 290;
-    const panelW = narrow ? 0 : 480;
+    /* 左栏 / 面板被收起时，可用区域变大，2D 图要跟着用满 */
+    const railCollapsed = document.body.classList.contains('rail-collapsed');
+    const panelCollapsed = document.body.classList.contains('panel-collapsed');
+    const railW = narrow || railCollapsed ? 0 : 290;
+    const panelW = narrow || panelCollapsed ? 0 : 480;
     const cx = narrow ? W / 2 : (railW + (W - panelW)) / 2;
     const cy = narrow ? H * 0.24 : H / 2;
 
@@ -188,6 +193,7 @@ window.KB = window.KB || {};
 
   function animateTo(target, ms) {
     cancelAnimationFrame(raf);
+    KB.hideTip();          // 布局一动，悬停提示就过时了
     const start = new Map();
     KB.NODES.forEach(n => start.set(n.id, { ...(pos.get(n.id) || { x: 0, y: 0 }) }));
     const t0 = performance.now();
@@ -209,6 +215,8 @@ window.KB = window.KB || {};
   /* 打开 2D 关系图：先从 3D 的当前投影位置开始，再摊平 */
   KB.twoDFocus = function (id) {
     if (!svg) return;
+    if (exitTimer) { clearTimeout(exitTimer); exitTimer = 0; }
+    svg.classList.remove('leaving');
     if (KB.state.mode !== '2d') {
       const p = projectedPositions();
       p.forEach((v, k) => pos.set(k, v));
@@ -221,12 +229,22 @@ window.KB = window.KB || {};
     animateTo(target, 720);
   };
 
-  KB.twoDExit = function () {
-    if (KB.state.mode === '2d') {
+  /* 退出 2D：默认让整张图缩小淡出，再切回 3D（Esc / 关闭 / 双击空白都走这里） */
+  KB.twoDExit = function (opts) {
+    if (KB.state.mode !== '2d') return;
+    if (exitTimer) { clearTimeout(exitTimer); exitTimer = 0; }
+
+    const finish = () => {
       KB.state.mode = '3d';
       document.body.classList.remove('mode-2d');
+      svg.classList.remove('leaving');
       cancelAnimationFrame(raf);
-    }
+    };
+
+    if (KB.reduceMotion || (opts && opts.animate === false)) { finish(); return; }
+
+    svg.classList.add('leaving');
+    exitTimer = setTimeout(() => { exitTimer = 0; finish(); }, 320);
   };
 
   KB.twoDRefresh = function () {
@@ -244,12 +262,33 @@ window.KB = window.KB || {};
       view.x = e.clientX - wx * k2;
       view.y = e.clientY - wy * k2;
       applyNow();
+
+      /* 缩小到底：直接退回 3D 全景 */
+      if (view.k <= 0.5) { KB.clearSelection(); return; }
+      /* 放大到阈值：进入光标下节点的内部 3D（没指到就进中心节点） */
+      if (view.k >= 2.2) {
+        const id = hoverId || KB.state.selected;
+        const node = id && KB.byId[id];
+        if (node && (node.children || []).length) {
+          KB.showToast('进入「' + node.name + '」的内部 3D');
+          KB.enterSubModel(id);
+        } else {
+          KB.clearSelection();
+        }
+        return;
+      }
     }, { passive: false });
 
     svg.addEventListener('pointerdown', (e) => {
+      KB.hideTip();
       if (e.button === 0 || e.button === 2) {
         drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, node: e.target.closest('.n2'), moved: false };
       }
+    });
+    /* 节点会在点击后挪走，鼠标不动指针事件不会补发 pointerout，
+       所以只要指针下面不是节点就把提示收掉 */
+    svg.addEventListener('pointermove', (e) => {
+      if (!e.target.closest('.n2')) KB.hideTip();
     });
     window.addEventListener('pointermove', (e) => {
       if (!drag) return;
@@ -262,7 +301,13 @@ window.KB = window.KB || {};
       const d = drag; drag = null;
       if (d.moved) return;
       const g = d.node;
-      if (g) KB.selectNode(g.getAttribute('data-id'), false);
+      if (g) { KB.hideTip(); KB.selectNode(g.getAttribute('data-id'), false); }
+    });
+
+    /* 双击空白：从 2D 关系图退回完整 3D 模型 */
+    svg.addEventListener('dblclick', (e) => {
+      if (KB.state.mode !== '2d') return;
+      KB.clearSelection();
     });
 
     svg.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -270,10 +315,10 @@ window.KB = window.KB || {};
       const g = e.target.closest('.n2');
       if (!g) return;
       const n = KB.byId[g.getAttribute('data-id')];
-      if (n) { KB.showNodeTip(n); KB.setCursor('pointer'); }
+      if (n) { hoverId = n.id; KB.showNodeTip(n); KB.setCursor('pointer'); }
     });
     svg.addEventListener('pointerout', (e) => {
-      if (e.target.closest('.n2')) { KB.hideTip(); KB.setCursor('grab'); }
+      if (e.target.closest('.n2')) { hoverId = null; KB.hideTip(); KB.setCursor('grab'); }
     });
   }
 })();

@@ -84,6 +84,8 @@ KB.syncFilterUI = function () {
   });
   const ds = document.getElementById('domainSelect');
   if (ds) ds.value = KB.state.domain || '';
+  const ls = document.getElementById('layoutSelect');
+  if (ls) ls.value = KB.state.layout || 'helix';
   const lm = document.getElementById('layerSelectMobile');
   if (lm) lm.value = KB.state.layer || '';
   const tm = document.getElementById('trackSelectMobile');
@@ -93,6 +95,21 @@ KB.syncFilterUI = function () {
 };
 
 KB.bindRail = function () {
+  /* 左栏收起 / 展开：收起后左边缘留一个把手 */
+  const setRailCollapsed = (on) => {
+    document.body.classList.toggle('rail-collapsed', on);
+    try { localStorage.setItem('kb.rail.collapsed', on ? '1' : ''); } catch (e) { /* 隐私模式 */ }
+    if (KB.updateViewOffset) KB.updateViewOffset();
+    if (KB.state.mode === '2d' && KB.state.selected) KB.twoDFocus(KB.state.selected);
+  };
+  const railToggle = document.getElementById('railToggle');
+  if (railToggle) railToggle.addEventListener('click', () => setRailCollapsed(true));
+  const railReopen = document.getElementById('railReopen');
+  if (railReopen) railReopen.addEventListener('click', () => setRailCollapsed(false));
+  try {
+    if (localStorage.getItem('kb.rail.collapsed') === '1') document.body.classList.add('rail-collapsed');
+  } catch (e) { /* 隐私模式 */ }
+
   /* 分区标题可折叠：14 个方向 + 13 层太长了 */
   document.querySelectorAll('.rail-title').forEach(el => {
     el.addEventListener('click', () => el.parentElement.classList.toggle('collapsed'));
@@ -126,6 +143,12 @@ KB.bindRail = function () {
       KB.state.status = (KB.state.status === v) ? null : v;
       KB.syncFilterUI();
     });
+  }
+
+  const layoutSelect = document.getElementById('layoutSelect');
+  if (layoutSelect) {
+    layoutSelect.value = KB.state.layout || 'helix';
+    layoutSelect.addEventListener('change', (e) => KB.setLayout(e.target.value));
   }
 
   const domainSelect = document.getElementById('domainSelect');
@@ -175,6 +198,8 @@ KB.bindRail = function () {
       const s = KB.state;
       s.layer = null; s.domain = null; s.status = null; s.track = null;
       s.selected = null; s.focus = null; s.editing = null;
+      if (KB.clearPath) KB.clearPath();
+      if (KB.exitSubModel) KB.exitSubModel(true);
       KB.twoDExit();
       KB.closePanel();
       KB.updateFocusBadge();
@@ -213,6 +238,7 @@ KB.bindRail = function () {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (KB.state.subOf) { KB.exitSubModel(); return; }
       KB.state.focus = null;
       KB.state.selected = null;
       KB.state.editing = null;
@@ -228,6 +254,7 @@ KB.bindRail = function () {
     clearTimeout(rt);
     rt = setTimeout(() => {
       if (KB.graph) KB.graph.width(window.innerWidth).height(window.innerHeight);
+      if (KB.updateViewOffset) KB.updateViewOffset();
     }, 120);
   });
 };

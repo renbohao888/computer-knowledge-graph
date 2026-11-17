@@ -109,6 +109,9 @@ KB.syncHash = function (id) {
 KB.selectNode = function (id, fly) {
   const n = KB.byId[id];
   if (!n) return;
+  if (KB.state.subOf) KB.exitSubModel(true);
+  /* 选中后节点会移动位置，悬停提示必须立刻收掉，否则会"黏"在原地 */
+  KB.clearHover();
   /* 切走之前把编辑器里没保存的输入收回内存，切回来还能接着写 */
   if (KB.state.editing && KB.editorSync) KB.editorSync();
   if (KB.state.focus && !KB.inFocusSet(id)) KB.state.focus = null;
@@ -125,6 +128,7 @@ KB.clearSelection = function () {
   KB.state.selected = null;
   KB.state.focus = null;
   KB.state.editing = null;
+  document.body.classList.remove('panel-collapsed');
   KB.closePanel();
   KB.updateFocusBadge();
   KB.twoDExit();
@@ -145,9 +149,11 @@ KB.toggleFocus = function (id) {
 /* 方向模式：让一条学习路径成为主视角 */
 KB.selectTrack = function (name) {
   if (!KB.TRACKS[name]) return;
+  if (KB.state.subOf) KB.exitSubModel(true);
   KB.state.track = (KB.state.track === name) ? null : name;
 
   if (KB.state.track) {
+    if (KB.clearPath) KB.clearPath();
     KB.state.layer = null;
     KB.state.domain = null;
     KB.state.status = null;
@@ -158,8 +164,8 @@ KB.selectTrack = function (name) {
     KB.updateFocusBadge();
     KB.syncFilterUI();
     const ids = KB.NODES.filter(n => n.tracks.includes(KB.state.track)).map(n => n.id);
-    KB.fitSubset(ids);
     KB.renderTrackPanel(KB.state.track);
+    KB.fitSubset(ids);
   } else {
     KB.closePanel();
     KB.syncFilterUI();

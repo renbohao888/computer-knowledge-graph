@@ -61,12 +61,31 @@ KB.renderPanel = function (id) {
     .map(e => e.id);
 
   const hitChild = KB.state.highlightChild || null;
-  const children = (n.children || []).map(ch => {
-    const hit = hitChild && ch.name === hitChild;
-    return `<div class="child${hit ? ' is-hit' : ''}">
-      <b>${KB.esc(ch.name)}</b>
-      <span>${KB.esc(ch.desc || '')}</span>
-    </div>`;
+  /* 细分知识点按分区展示（details-*.js 里带 group 的条目） */
+  function groupChildren(list) {
+    const out = [];
+    list.forEach(ch => {
+      const name = ch.group || '';
+      let g = out.find(x => x.name === name);
+      if (!g) { g = { name, items: [] }; out.push(g); }
+      g.items.push(ch);
+    });
+    return out;
+  }
+  const childGroups = groupChildren(n.children || []);
+  const colorForGroup = (gi) => (KB.subColorOf ? KB.subColorOf(gi) : '#5cc8ff');
+  const children = childGroups.map((g, gi) => {
+    const head = g.name
+      ? `<div class="sub-group-title"><i style="--c:${colorForGroup(gi)}"></i>${KB.esc(g.name)}<em>${g.items.length}</em></div>`
+      : '';
+    const items = g.items.map(ch => {
+      const hit = hitChild && ch.name === hitChild;
+      return `<div class="child${hit ? ' is-hit' : ''}">
+        <b>${KB.esc(ch.name)}</b>
+        <span>${KB.esc(ch.desc || '')}</span>
+      </div>`;
+    }).join('');
+    return head + items;
   }).join('');
 
   const st = KB.effStatus(n);
@@ -96,33 +115,40 @@ KB.renderPanel = function (id) {
          <button class="a-edit primary" data-edit-article>✍ 写这篇教程</button>`;
 
   panel.innerHTML = `
-    <button class="panel-close" data-close aria-label="关闭详情">✕</button>
-    ${KB.state.track ? `<button class="p-back" data-backtrack>← ${KB.esc(KB.state.track)} 方向</button>` : ''}
-    <div class="p-layer">
-      <span class="p-stack">${KB.LAYERS.map((l, i) => `<i class="${i === li ? 'on' : ''}"></i>`).join('')}</span>
-      <span>${KB.esc(n.layer)}</span>
-      <span class="p-depth">第 ${li + 1} 层 / ${KB.LAYERS.length}</span>
+    <div class="p-tools">
+      <button class="panel-close" data-close aria-label="关闭详情">✕</button>
     </div>
-    <h2 class="p-title">${KB.esc(n.name)}</h2>
-    <div class="p-chips">
-      <span class="chip chip-status" style="--c:${color}">${KB.esc(st)}</span>
-      <span class="chip">${KB.esc(n.domain)}</span>
-      ${n.tracks.length ? `<span class="chip">${KB.esc(n.tracks.join(' / '))}</span>` : ''}
-      <span class="chip chip-dim">${n._deg} 条连线</span>
+    <div class="p-scroll">
+      ${KB.state.track ? `<button class="p-back" data-backtrack>← ${KB.esc(KB.state.track)} 方向</button>` : ''}
+      <div class="p-layer">
+        <span class="p-stack">${KB.LAYERS.map((l, i) => `<i class="${i === li ? 'on' : ''}"></i>`).join('')}</span>
+        <span>${KB.esc(n.layer)}</span>
+        <span class="p-depth">第 ${li + 1} 层 / ${KB.LAYERS.length}</span>
+      </div>
+      <h2 class="p-title">${KB.esc(n.name)}</h2>
+      <div class="p-chips">
+        <span class="chip chip-status" style="--c:${color}">${KB.esc(st)}</span>
+        <span class="chip">${KB.esc(n.domain)}</span>
+        ${n.tracks.length ? `<span class="chip">${KB.esc(n.tracks.join(' / '))}</span>` : ''}
+        <span class="chip chip-dim">${n._deg} 条连线</span>
+      </div>
+      ${n.children && n.children.length ? `<button class="p-sub-enter" data-enter-sub>🧬 进入内部 3D · ${n.children.length} 个细分区</button>` : ''}
+      <div class="p-progress">
+        <span>我的进度</span>
+        ${KB.STATUS_LIST.map(s => `<button class="p-prog${st === s ? ' active' : ''}" data-progress="${KB.esc(s)}" style="--c:${KB.STATUS_COLOR[s]}">${KB.esc(s)}</button>`).join('')}
+        ${KB.hasProgress(n) ? `<em>作者标注 ${KB.esc(n.status)}</em>` : ''}
+      </div>
+      <div class="p-tabs">
+        <button class="p-tab${tab === 'overview' ? ' active' : ''}" data-tab="overview">概览</button>
+        <button class="p-tab${tab === 'article' ? ' active' : ''}" data-tab="article">教程${editing ? ' · 编辑中' : article ? '' : ' · 待补'}</button>
+      </div>
+      <div class="p-tab-body">${tab === 'article' ? articleHtml : overview}</div>
     </div>
-    <div class="p-progress">
-      <span>我的进度</span>
-      ${KB.STATUS_LIST.map(s => `<button class="p-prog${st === s ? ' active' : ''}" data-progress="${KB.esc(s)}" style="--c:${KB.STATUS_COLOR[s]}">${KB.esc(s)}</button>`).join('')}
-      ${KB.hasProgress(n) ? `<em>作者标注 ${KB.esc(n.status)}</em>` : ''}
-    </div>
-    <div class="p-tabs">
-      <button class="p-tab${tab === 'overview' ? ' active' : ''}" data-tab="overview">概览</button>
-      <button class="p-tab${tab === 'article' ? ' active' : ''}" data-tab="article">教程${editing ? ' · 编辑中' : article ? '' : ' · 待补'}</button>
-    </div>
-    <div class="p-tab-body">${tab === 'article' ? articleHtml : overview}</div>
   `;
   panel.classList.add('open');
-  panel.scrollTop = 0;
+  if (KB.updateViewOffset) KB.updateViewOffset();
+  const sc = panel.querySelector('.p-scroll');
+  if (sc) sc.scrollTop = 0;
 
   if (hitChild && tab !== 'article') {
     const el = panel.querySelector('.child.is-hit');
@@ -159,40 +185,58 @@ KB.renderTrackPanel = function (name) {
     .filter(g => g.arr.length);
 
   panel.innerHTML = `
-    <button class="panel-close" data-close aria-label="关闭详情">✕</button>
-    <div class="p-layer">
-      <span class="p-stack">${KB.LAYERS.map(l => `<i class="${layerHas.has(l) ? 'on' : ''}"></i>`).join('')}</span>
-      <span>学习方向</span>
-      <span class="p-depth">${nodes.length} 个知识点</span>
+    <div class="p-tools">
+      <button class="panel-close" data-close aria-label="关闭详情">✕</button>
     </div>
-    <h2 class="p-title">${KB.esc(name)}</h2>
-    <p class="p-desc">${KB.esc(info.desc)}</p>
-    <div class="track-stats">
-      ${counts.map(x => `<div class="ts-row"><i style="background:${KB.STATUS_COLOR[x.s]}"></i><span>${x.s}</span><b>${x.c}</b></div>`).join('')}
+    <div class="p-scroll">
+      <div class="p-layer">
+        <span class="p-stack">${KB.LAYERS.map(l => `<i class="${layerHas.has(l) ? 'on' : ''}"></i>`).join('')}</span>
+        <span>学习方向</span>
+        <span class="p-depth">${nodes.length} 个知识点</span>
+      </div>
+      <h2 class="p-title">${KB.esc(name)}</h2>
+      <p class="p-desc">${KB.esc(info.desc)}</p>
+      <div class="track-stats">
+        ${counts.map(x => `<div class="ts-row"><i style="background:${KB.STATUS_COLOR[x.s]}"></i><span>${x.s}</span><b>${x.c}</b></div>`).join('')}
+      </div>
+      <div class="progress"><i style="width:${pct}%"></i></div>
+      <p class="progress-text">${pct}% 已掌握 · 同色是同一方向，越亮越需要补</p>
+      ${groups.map(g => `
+        <div class="p-group">
+          <div class="p-group-title"><span>${KB.esc(g.l)}</span><b style="margin-left:auto">${g.arr.length}</b></div>
+          <ul class="p-nb">${g.arr.map(n => {
+            const s2 = KB.effStatus(n);
+            const c = KB.STATUS_COLOR[s2] || '#9fb3cc';
+            return `<li><button data-goto="${KB.esc(n.id)}">
+              <span class="dot" style="background:${c};color:${c}"></span>
+              <span class="nb-name">${KB.esc(n.name)}</span>
+              <span class="nb-rel">${KB.esc(s2)}</span>
+            </button></li>`;
+          }).join('')}</ul>
+        </div>`).join('')}
+      <button class="p-focus" data-clear-track>退出方向模式</button>
     </div>
-    <div class="progress"><i style="width:${pct}%"></i></div>
-    <p class="progress-text">${pct}% 已掌握 · 同色是同一方向，越亮越需要补</p>
-    ${groups.map(g => `
-      <div class="p-group">
-        <div class="p-group-title"><span>${KB.esc(g.l)}</span><b style="margin-left:auto">${g.arr.length}</b></div>
-        <ul class="p-nb">${g.arr.map(n => {
-          const s2 = KB.effStatus(n);
-          const c = KB.STATUS_COLOR[s2] || '#9fb3cc';
-          return `<li><button data-goto="${KB.esc(n.id)}">
-            <span class="dot" style="background:${c};color:${c}"></span>
-            <span class="nb-name">${KB.esc(n.name)}</span>
-            <span class="nb-rel">${KB.esc(s2)}</span>
-          </button></li>`;
-        }).join('')}</ul>
-      </div>`).join('')}
-    <button class="p-focus" data-clear-track>退出方向模式</button>
   `;
   panel.classList.add('open');
+  if (KB.updateViewOffset) KB.updateViewOffset();
 };
 
 KB.closePanel = function () {
   const panel = KB.getPanel();
   if (panel) panel.classList.remove('open');
+  document.body.classList.remove('panel-collapsed');
+  if (KB.updateViewOffset) KB.updateViewOffset();
+};
+
+/* 收起 / 展开详情面板：收起后右边缘留一个"详情"把手 */
+KB.togglePanelCollapse = function (force) {
+  const on = typeof force === 'boolean'
+    ? force
+    : !document.body.classList.contains('panel-collapsed');
+  document.body.classList.toggle('panel-collapsed', on);
+  if (KB.updateViewOffset) KB.updateViewOffset();
+  /* 2D 关系图跟着重新摊开 / 收拢，别把节点留在面板底下 */
+  if (KB.state.mode === '2d' && KB.state.selected) KB.twoDFocus(KB.state.selected);
 };
 
 KB.renderPanelIfOpen = function () {
@@ -200,9 +244,47 @@ KB.renderPanelIfOpen = function () {
 };
 
 KB.bindPanel = function () {
+  const reopen = document.getElementById('panelReopen');
+  if (reopen) reopen.addEventListener('click', () => KB.togglePanelCollapse(false));
+  const edge = document.getElementById('panelEdgeToggle');
+  if (edge) edge.addEventListener('click', () => KB.togglePanelCollapse(true));
+
   KB.getPanel().addEventListener('click', (e) => {
     /* 任何会重绘面板的点击之前，先把编辑器里正在输入的内容收回状态 */
     if (KB.state.editing && KB.editorSync) KB.editorSync();
+
+    if (e.target.closest('[data-collapse]')) { KB.togglePanelCollapse(true); return; }
+    /* 学习路线 */
+    const po = e.target.closest('[data-path-open]');
+    if (po) { KB.renderPathDetail(po.dataset.pathOpen); return; }
+    if (e.target.closest('[data-path-back]')) { KB.renderPathsPanel(); return; }
+    const pd = e.target.closest('[data-path-done]');
+    if (pd) { KB.togglePathDone(KB.state.pathView, Number(pd.dataset.pathDone)); KB.renderPathDetail(KB.state.pathView); return; }
+    const pg = e.target.closest('[data-path-go]');
+    if (pg) { KB.selectNode(pg.dataset.pathGo, true); return; }
+    if (e.target.closest('[data-path-highlight]')) {
+      const id = KB.state.pathView;
+      KB.setPathHighlight(id, KB.state.path !== id);
+      KB.renderPathDetail(id);
+      return;
+    }
+    if (e.target.closest('[data-path-exit]')) { KB.setPathHighlight(null, false); KB.closePanel(); return; }
+
+    /* 节点内部 3D */
+    if (e.target.closest('[data-enter-sub]')) { KB.enterSubModel(KB.state.selected); return; }
+    if (e.target.closest('[data-exit-sub]')) { KB.exitSubModel(); return; }
+    if (e.target.closest('[data-sub-back]')) { KB.renderSubPanel(KB.state.subOf); return; }
+    const sg = e.target.closest('[data-sub-go]');
+    if (sg) {
+      const i = Number(sg.dataset.subGo);
+      const node = (KB.subNodes || []).find(x => x._idx === i);
+      if (node) {
+        KB.state.subChild = node.id;
+        if (KB.graph) KB.graph.nodeColor(KB.subNodeColor);
+        KB.renderSubChild(node);
+      }
+      return;
+    }
 
     const go = e.target.closest('[data-goto]');
     if (go) { KB.selectNode(go.dataset.goto, true); return; }
@@ -230,6 +312,10 @@ KB.bindPanel = function () {
       return;
     }
     if (e.target.closest('[data-ed-download]')) { KB.downloadUserContent(); return; }
-    if (e.target.closest('[data-close]')) { KB.state.editing = null; KB.clearSelection(); }
+    if (e.target.closest('[data-close]')) {
+      if (KB.state.subOf) { KB.exitSubModel(); return; }
+      KB.state.editing = null;
+      KB.clearSelection();
+    }
   });
 };

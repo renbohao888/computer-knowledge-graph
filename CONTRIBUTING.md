@@ -54,6 +54,39 @@
 
 数据是纯 JS 字面量，Git 里可 diff、可 review，不需要数据库。
 
+## 给节点加"内部 3D"的细分内容
+
+每个节点点进去的 3D 结构来自 `src/data/details-*.js`。按节点 id 添加：
+
+```js
+KB.DETAILS.mysql = { groups: [
+  { name: '索引', items: [
+    { name: 'B+ 树结构', desc: '为什么用 B+ 树而不是二叉树或哈希。' },
+    { name: '最左前缀', desc: '(a,b,c) 能命中哪些查询。' }
+  ] },
+  { name: '事务与锁', items: [ /* ... */ ] }
+] };
+```
+
+- `groups` 就是内部 3D 的分区，每个分区一种颜色、末端显示分区名
+- 分区内 `items` 的顺序就是建议学习顺序（面板和标签上的编号）
+- 写完跑 `node scripts/validate.mjs`，会检查节点 id、分区名和条目完整性
+- 找不到该放哪个文件时，就新建一个 `details-xxx.js`，记得在 `index.html` 和校验脚本里加上
+
+## 加一条学习路线
+
+在 `src/data/paths.js`（或 `paths-more.js`）里加一条：
+
+```js
+{ id: 'your-path', name: '路线名', level: '起点 → 终点', desc: '一句话说明',
+  steps: [
+    { phase: '一、基础', node: 'linux', title: 'Linux 基础', note: '学到什么程度' },
+    { phase: '一、基础', task: true, title: '动手任务', note: '不在图里的实操' }
+  ] }
+```
+
+`node` 必须是现有节点 id；`task` 步骤没有节点，前端可以手动勾选完成。
+
 ## 加一个知识点
 
 在 `src/data/nodes.js` 里按层找到合适的位置，加一条：

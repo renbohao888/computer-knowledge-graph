@@ -369,7 +369,7 @@ window.KB.NODES = [
 
     /* —— 编程语言（按使用位置摆放） —— */
     { id:'js-ts', name:'JavaScript / TypeScript', layer:'用户与客户端', domain:'研发效率', status:'待补充', tracks:['前端','语言','移动端'], before:['browser'],
-      keywords:['javascript','typescript','ts','前端语言'],
+      keywords:['javascript','typescript','js','ts','前端语言'],
       description:'浏览器、Node 与小程序共用的语言；类型系统、异步模型和运行时差异是主要门槛。' },
     { id:'c-cpp', name:'C / C++', layer:'应用层', domain:'性能', status:'待补充', tracks:['后端','语言','嵌入式'], before:['mem','process'],
       keywords:['c','cpp','c++','指针','内存'],

@@ -18,6 +18,7 @@
 
 <!-- 左上：标题 · 方向 · 分层 · 掌握度 -->
 <aside id="rail">
+  <button id="railToggle" class="rail-toggle" type="button" title="收起左栏" aria-label="收起左栏">‹</button>
   <h1>计算机知识体系</h1>
   <p class="rail-sub"><b id="statNodes">0</b> 个节点 · <b id="statLinks">0</b> 条关系 · 按层吸附</p>
 
@@ -64,7 +65,13 @@
   <span id="matchStat">—</span>
   <label class="field only-mobile"><span>方向</span><select id="trackSelectMobile"></select></label>
   <label class="field only-mobile"><span>分层</span><select id="layerSelectMobile"></select></label>
+  <label class="field"><span>布局</span><select id="layoutSelect" title="切换 3D 布局">
+    <option value="helix">立体螺旋</option>
+    <option value="free">自由星云</option>
+    <option value="plane">分层平面</option>
+  </select></label>
   <label class="field"><span>问题域</span><select id="domainSelect"></select></label>
+  <button class="ghost" id="pathBtn">路线</button>
   <button class="ghost" id="labelBtn" aria-pressed="true">标签</button>
   <button class="ghost" id="relBtn" aria-pressed="true">关系</button>
   <button class="ghost" id="resetBtn">重置</button>
@@ -72,6 +79,9 @@
 
 <!-- 右侧：详情面板 -->
 <aside id="panel" aria-live="polite"></aside>
+<button id="panelEdgeToggle" type="button" title="收起面板" aria-label="收起面板">›</button>
+<button id="panelReopen" type="button" title="打开详情面板" aria-label="打开详情面板"><span>详</span><span>情</span></button>
+<button id="railReopen" type="button" title="展开左栏" aria-label="展开左栏">›</button>
 
 <div id="tooltip"></div>
 <div id="focusBadge"></div>
@@ -94,15 +104,26 @@
 <script src="src/data/links.js"></script>
 <script src="src/data/links-more.js"></script>
 <script src="src/data/articles.js"></script>
+<script src="src/data/details-os-net.js"></script>
+<script src="src/data/details-backend.js"></script>
+<script src="src/data/details-web.js"></script>
+<script src="src/data/details-data-ai.js"></script>
+<script src="src/data/details-infra-embedded.js"></script>
+<script src="src/data/details-lang-arch.js"></script>
+<script src="src/data/details-extra.js"></script>
+<script src="src/data/paths.js"></script>
+<script src="src/data/paths-more.js"></script>
 <script src="src/core/util.js"></script>
 <script src="src/core/store.js"></script>
 <script src="src/core/progress.js"></script>
 <script src="src/core/content.js"></script>
 <script src="src/core/graph.js"></script>
 <script src="src/core/actions.js"></script>
+<script src="src/core/sub-model.js"></script>
 <script src="src/ui/tooltip.js"></script>
 <script src="src/ui/panel.js"></script>
 <script src="src/ui/editor.js"></script>
+<script src="src/ui/paths.js"></script>
 <script src="src/ui/search.js"></script>
 <script src="src/ui/labels.js"></script>
 <script src="src/ui/rail.js"></script>

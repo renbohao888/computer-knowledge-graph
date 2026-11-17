@@ -65,6 +65,8 @@ KB.state = {
   domain: null,
   status: null,
   track: null,
+  path: null,            // 当前在图上高亮的学习路线 id
+  pathView: null,        // 详情面板里正在看哪条路线
   hover: null,
   hoverLink: null,
   labels: true,

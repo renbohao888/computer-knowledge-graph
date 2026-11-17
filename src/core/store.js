@@ -28,6 +28,33 @@ KB.buildIndex = function () {
     if (!Array.isArray(n.keywords)) n.keywords = [];
   });
 
+  /* 节点内部的详细拆解（details-*.js）覆盖简略的 children */
+  if (KB.DETAILS) {
+    Object.keys(KB.DETAILS).forEach(id => {
+      const n = KB.byId[id];
+      const d = KB.DETAILS[id];
+      if (!n || !d || !Array.isArray(d.groups)) return;
+      const items = [];
+      d.groups.forEach(g => (g.items || []).forEach(it => {
+        if (!it || !it.name) return;
+        items.push({ name: it.name, desc: it.desc || '', group: g.name });
+      }));
+      /* 保留原 nodes*.js 里没有被详细拆解覆盖到的子条目，
+         避免"注解 Annotation"这类老路径搜不到 */
+      const squash = (x) => String(x || '').toLowerCase().replace(/[\s/\-_.·、，,()（）]+/g, '');
+      (n.children || []).forEach(ch => {
+        const cs = squash(ch.name);
+        if (!cs) return;
+        const covered = items.some(it => {
+          const is = squash(it.name);
+          return is === cs || is.includes(cs) || cs.includes(is);
+        });
+        if (!covered) items.push({ name: ch.name, desc: ch.desc || '', group: '核心要点' });
+      });
+      if (items.length) n.children = items;
+    });
+  }
+
   KB.LINKS.forEach(l => {
     const s = KB.idOf(l.source), t = KB.idOf(l.target);
     if (KB.byId[s] == null || KB.byId[t] == null) return;  // 写错的 id 直接跳过

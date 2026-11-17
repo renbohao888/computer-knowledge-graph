@@ -1,0 +1,14 @@
+# 开发容器：源码直接挂进镜像，改完刷新浏览器就生效，不用重建。
+# 用法：docker compose -f docker-compose.dev.yml up -d   → http://localhost:8790
+# 与正式容器（8787）互不影响。
+services:
+  dev:
+    image: computer-knowledge-graph:latest
+    container_name: computer-knowledge-graph-dev
+    ports:
+      - "8790:80"
+    volumes:
+      - ./src:/app/src:ro
+      - ./index.html:/app/index.html:ro
+      - ./data:/data
+    restart: unless-stopped

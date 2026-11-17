@@ -1,15 +1,16 @@
 /* ============================================================
- * 搜索：名称 / id / 别名 keywords / 子知识点 children / 层 / 方向 / 描述
- * 命中子知识点时，结果会显示「Java 语言与并发 › 注解 Annotation」，
- * 选中后面板会滚到那一条并高亮。
+ * 搜索：节点 / 细分知识点 / 分区 / 学习路线 一起联想
+ * - 输入 JS、TS、K8s 这类缩写也能命中
+ * - 细分点和分区作为独立结果出现，点击直接进入该节点的内部 3D 并定位
+ * - 空输入聚焦时给出几个示例词
  * ============================================================ */
 window.KB = window.KB || {};
 
 let srList = [];
 let srIndex = 0;
+let SR_INDEX = null;
 
 const squash = (s) => String(s || '').toLowerCase().replace(/[\s/\-_.·、，,()（）]+/g, '');
-
 function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 function hl(text, q) {
@@ -20,32 +21,69 @@ function hl(text, q) {
   } catch (e) { return KB.esc(text); }
 }
 
-/* 一个字段是否命中某个词。单字/双字要更严格，避免 "c" 把什么都匹配上 */
-function fieldHit(field, token) {
-  const f = String(field || '').toLowerCase();
-  const t = token.toLowerCase();
-  const ts = squash(t);
-  if (ts.length < 2) return squash(f) === ts;
-  return f.includes(t) || squash(f).includes(ts);
+function buildIndex() {
+  if (SR_INDEX) return SR_INDEX;
+  const idx = [];
+  KB.NODES.forEach(n => {
+    idx.push({
+      kind: 'node', id: n.id, name: n.name, layer: n.layer,
+      kw: (n.keywords || []).join(' '), desc: n.description || ''
+    });
+    const seenGroups = new Set();
+    (n.children || []).forEach(ch => {
+      if (ch.group) seenGroups.add(ch.group);
+      idx.push({
+        kind: 'child', id: n.id, parent: n.name, name: ch.name,
+        group: ch.group || '', desc: ch.desc || '', layer: n.layer
+      });
+    });
+    seenGroups.forEach(g => {
+      idx.push({ kind: 'group', id: n.id, parent: n.name, name: g, group: g, layer: n.layer });
+    });
+  });
+  (KB.PATHS || []).forEach(p => {
+    idx.push({ kind: 'path', id: p.id, pathId: p.id, name: p.name, level: p.level || '', layer: '学习路线' });
+  });
+  SR_INDEX = idx;
+  return idx;
 }
 
-function nodeFields(n) {
-  return [n.name, n.id, n.layer, n.domain, n.description]
-    .concat(n.keywords || [])
-    .concat((n.children || []).map(c => c.name));
-}
+/* 一条索引项的匹配分；所有查询词都必须出现在它的某个字段里 */
+function scoreItem(it, q, qs, tokens) {
+  const name = it.name || '';
+  const nameL = name.toLowerCase();
+  const ns = squash(name);
+  const hay = squash([name, it.kw, it.group, it.parent, it.level, it.desc].filter(Boolean).join(' '));
+  if (!tokens.every(tk => hay.includes(squash(tk)))) return 0;
 
-/* 多词查询：每个词都要在这条知识点的某个字段里出现 */
-function nodeHasAllTokens(n, tokens) {
-  const fields = nodeFields(n);
-  return tokens.every(tk => fields.some(f => fieldHit(f, tk)));
-}
+  let score = 0;
+  if (nameL === q || ns === qs) score = it.kind === 'node' ? 150 : 146;
+  else if (nameL.startsWith(q) || (qs && ns.startsWith(qs))) score = 128;
+  else if (nameL.includes(q) || (qs && ns.includes(qs))) score = 110;
 
-function childForTokens(n, tokens) {
-  for (const ch of n.children || []) {
-    if (tokens.some(tk => fieldHit(ch.name, tk))) return ch.name;
+  if (!score && it.kw) {
+    for (const k of it.kw.toLowerCase().split(/\s+/)) {
+      if (!k) continue;
+      if (k === q || squash(k) === qs) { score = 106; break; }
+      if (squash(k).length >= 2 && (k.includes(q) || squash(k).includes(qs))) { score = 84; break; }
+    }
   }
-  return null;
+
+  if (!score && it.group && squash(it.group).includes(qs)) score = 86;
+  if (!score && it.parent && squash(it.parent).includes(qs)) score = 70;
+  if (!score && it.desc && squash(it.desc).includes(qs)) score = 58;
+  if (!score && it.level && squash(it.level).includes(qs)) score = 58;
+  if (!score) return 0;
+
+  /* 多词查询：名字里同时出现越多，越靠前 */
+  if (tokens.length > 1) {
+    const inName = tokens.filter(tk => squash(name).includes(squash(tk))).length;
+    score += inName * 12;
+  }
+  /* 同分时细分/分区比整节点更具体 */
+  if (it.kind === 'child') score += 4;
+  if (it.kind === 'group') score += 3;
+  return score;
 }
 
 KB.searchNodes = function (query) {
@@ -54,66 +92,34 @@ KB.searchNodes = function (query) {
   const q = raw.toLowerCase();
   const qs = squash(raw);
   const tokens = q.split(/\s+/).filter(Boolean);
-  const hits = [];
 
-  for (const n of KB.NODES) {
-    let score = 0;
-    let child = null;
-    const name = n.name.toLowerCase();
+  /* 1–3 个字母的缩写（js/ts/k8s）只给节点和路线结果：
+     否则 jstack、JSON、HSTS 这些词里的字母会把列表刷满。 */
+  const shortAcronym = tokens.length === 1 && /^[a-z0-9]{1,3}$/i.test(tokens[0]);
 
-    if (tokens.length > 1) {
-      /* "java 注解" 这种：所有词都要命中 */
-      if (!nodeHasAllTokens(n, tokens)) continue;
-      score = squash(name).includes(qs) ? 95 : 72;
-      child = childForTokens(n, tokens);
-    } else {
-      if (name === q) score = 140;
-      else if (name.startsWith(q)) score = 120;
-      else if (name.includes(q)) score = 100;
-      else if (squash(name) === qs) score = 95;
-      else if (squash(name).includes(qs)) score = 85;
-      else if (n.id.toLowerCase() === q || n.id.toLowerCase() === qs) score = 90;
-      else if (n.id.toLowerCase().includes(q)) score = 60;
-
-      /* 子知识点比别名更具体，先看它 */
-      if (!score) {
-        for (const ch of n.children) {
-          const cn = ch.name.toLowerCase();
-          if (cn === q || squash(cn) === qs) { score = 78; child = ch.name; break; }
-          if (qs.length >= 2 && (cn.includes(q) || squash(cn).includes(qs))) { score = 62; child = ch.name; break; }
-          if (qs.length >= 2 && squash(ch.desc || '').includes(qs)) { score = 42; child = ch.name; break; }
-        }
-      }
-
-      /* 别名：短的只允许完全相等 */
-      if (!score) {
-        for (const k of n.keywords) {
-          const kk = k.toLowerCase();
-          const kl = squash(kk);
-          if (kk === q || kl === qs) { score = 80; break; }
-          if (kl.length >= 3 && (kk.includes(q) || kl.includes(qs) || q.includes(kk))) { score = 65; break; }
-        }
-      }
-
-      /* 已经是子知识点命中的，补一个高亮（别名命中时也一样） */
-      if (score && !child) {
-        const ch = (n.children || []).find(x => fieldHit(x.name, q));
-        if (ch) child = ch.name;
-      }
-
-      if (!score) {
-        if (n.layer.toLowerCase().includes(q) || n.domain.toLowerCase().includes(q)) score = 30;
-        else if (n.description.toLowerCase().includes(q)) score = 20;
-      }
-    }
-
-    if (score) hits.push({ id: n.id, name: n.name, layer: n.layer, child, score });
+  const out = [];
+  for (const it of buildIndex()) {
+    if (shortAcronym && it.kind !== 'node' && it.kind !== 'path') continue;
+    const s = scoreItem(it, q, qs, tokens);
+    if (s > 0) out.push(Object.assign({ score: s }, it));
   }
 
-  return hits
-    .sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name, 'zh'))
-    .slice(0, 8);
+  out.sort((a, b) => (b.score - a.score) ||
+    (a.kind === b.kind ? a.name.localeCompare(b.name, 'zh') : a.kind.localeCompare(b.kind)));
+
+  const seen = new Set();
+  const picked = [];
+  for (const r of out) {
+    const key = r.kind + '|' + r.id + '|' + (r.kind === 'child' ? r.name : '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(r);
+    if (picked.length >= 8) break;
+  }
+  return picked;
 };
+
+const KIND_LABEL = { node: '节点', child: '细分', group: '分区', path: '路线' };
 
 function renderSearchResults() {
   const input = document.getElementById('searchInput');
@@ -122,21 +128,51 @@ function renderSearchResults() {
   if (!q) { box.classList.remove('show'); srList = []; return; }
 
   box.innerHTML = srList.length
-    ? srList.map((r, i) => `
-        <button class="sr-item${i === srIndex ? ' active' : ''}" data-id="${KB.esc(r.id)}" data-child="${KB.esc(r.child || '')}" role="option">
-          <span class="sr-dot" style="background:${KB.STATUS_COLOR[KB.effStatus(KB.byId[r.id])] || '#9fb3cc'}"></span>
-          <span class="sr-name">${hl(r.name, q)}${r.child ? `<em> › ${hl(r.child, q)}</em>` : ''}</span>
-          <span class="sr-layer">${KB.esc(r.layer)}</span>
-        </button>`).join('')
-    : `<div class="sr-empty">没有匹配「${KB.esc(q)}」的知识点</div>`;
+    ? srList.map((r, i) => {
+        const isNode = r.kind === 'node';
+        const dot = isNode
+          ? `<span class="sr-dot" style="background:${KB.STATUS_COLOR[KB.effStatus(KB.byId[r.id])] || '#9fb3cc'}"></span>`
+          : `<span class="sr-kind sr-kind-${r.kind}">${KIND_LABEL[r.kind]}</span>`;
+        const parent = (r.kind === 'child' || r.kind === 'group') ? `<em class="sr-parent">${KB.esc(r.parent)} › </em>` : '';
+        const group = (r.kind === 'child' && r.group) ? `<em class="sr-group">${KB.esc(r.group)}</em>` : '';
+        const sub = (r.kind === 'child' && r.desc) ? `<span class="sr-sub">${KB.esc(r.desc).slice(0, 46)}</span>` : '';
+        return `<button class="sr-item${i === srIndex ? ' active' : ''}" data-i="${i}" role="option">
+          ${dot}
+          <span class="sr-main">
+            <span class="sr-name">${parent}${hl(r.name, q)}${group}</span>
+            ${sub}
+          </span>
+          <span class="sr-layer">${isNode ? KB.esc(r.layer) : (r.kind === 'path' ? '路线' : KIND_LABEL[r.kind])}</span>
+        </button>`;
+      }).join('')
+    : `<div class="sr-empty">没有匹配「${KB.esc(q)}」的节点或细分点</div>`;
 
   box.classList.add('show');
   const act = box.querySelector('.sr-item.active');
   if (act) act.scrollIntoView({ block: 'nearest' });
 }
 
-KB.chooseSearch = function (id, child) {
-  const n = KB.byId[id];
+function renderExamples() {
+  const box = document.getElementById('searchResults');
+  const ex = ['JS', 'TS', 'K8s', '注解', '主从延迟', '泛型'];
+  box.innerHTML = `
+    <div class="sr-examples">
+      <span>试试：</span>
+      ${ex.map(x => `<button class="sr-ex" data-ex="${KB.esc(x)}">${KB.esc(x)}</button>`).join('')}
+    </div>`;
+  box.classList.add('show');
+}
+
+/* 选中一条结果 */
+KB.chooseSearch = function (r) {
+  if (typeof r === 'string') r = { kind: 'node', id: r };
+  if (!r || !r.id) return;
+  document.getElementById('searchResults').classList.remove('show');
+  document.getElementById('searchInput').blur();
+
+  if (r.kind === 'path') { KB.renderPathDetail(r.pathId || r.id); return; }
+
+  const n = KB.byId[r.id];
   if (!n) return;
   /* 当前筛选把它藏了，就先清空，免得"飞过去却看不见" */
   if (!KB.matches(n)) {
@@ -144,11 +180,30 @@ KB.chooseSearch = function (id, child) {
     s.layer = null; s.domain = null; s.status = null; s.track = null;
     KB.syncFilterUI();
   }
-  KB.state.highlightChild = child || null;
-  document.getElementById('searchResults').classList.remove('show');
-  document.getElementById('searchInput').blur();
-  KB.selectNode(id, false);
-  KB.orbitTo(n, 1250);
+
+  if (r.kind === 'node') {
+    KB.state.highlightChild = null;
+    KB.selectNode(r.id, false);
+    KB.orbitTo(n, 1250);
+    return;
+  }
+
+  /* 细分点 / 分区：直接进入节点内部 3D，并定位到命中的位置 */
+  KB.state.highlightChild = r.kind === 'child' ? (r.name || null) : null;
+  KB.enterSubModel(r.id);
+  if (r.kind === 'child' && r.name) {
+    const sub = (KB.subNodes || []).find(x => x._sub && x.name === r.name);
+    if (sub) {
+      KB.state.subChild = sub.id;
+      if (KB.graph) KB.graph.nodeColor(KB.subNodeColor);
+      KB.renderSubChild(sub);
+    }
+  } else if (r.kind === 'group' && r.name) {
+    const titles = [...document.querySelectorAll('#panel .sub-group-title')];
+    const t = titles.find(el => el.textContent.trim().startsWith(r.name));
+    if (t) t.scrollIntoView({ block: 'start' });
+  }
+  KB.showToast('已进入「' + n.name + '」内部 · ' + (r.name || ''));
 };
 
 KB.bindSearch = function () {
@@ -166,6 +221,8 @@ KB.bindSearch = function () {
       srList = KB.searchNodes(input.value);
       srIndex = 0;
       renderSearchResults();
+    } else {
+      renderExamples();
     }
   });
 
@@ -183,8 +240,7 @@ KB.bindSearch = function () {
     } else if (e.key === 'Enter') {
       if (srList[srIndex]) {
         e.preventDefault();
-        const r = srList[srIndex];
-        KB.chooseSearch(r.id, r.child);
+        KB.chooseSearch(srList[srIndex]);
       }
     } else if (e.key === 'Escape') {
       e.stopPropagation();
@@ -194,10 +250,21 @@ KB.bindSearch = function () {
   });
 
   box.addEventListener('mousedown', (e) => {
-    const b = e.target.closest('[data-id]');
+    const ex = e.target.closest('[data-ex]');
+    if (ex) {
+      e.preventDefault();
+      input.value = ex.dataset.ex;
+      srList = KB.searchNodes(input.value);
+      srIndex = 0;
+      renderSearchResults();
+      input.focus();
+      return;
+    }
+    const b = e.target.closest('[data-i]');
     if (b) {
       e.preventDefault();
-      KB.chooseSearch(b.dataset.id, b.dataset.child || null);
+      const r = srList[Number(b.dataset.i)];
+      if (r) KB.chooseSearch(r);
     }
   });
 

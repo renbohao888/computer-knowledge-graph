@@ -22,7 +22,16 @@ vm.runInContext(read('src/config.js'), ctx);
   'src/data/nodes-data-ai.js',
   'src/data/nodes-systems.js',
   'src/data/links.js',
-  'src/data/links-more.js'
+  'src/data/links-more.js',
+  'src/data/paths.js',
+  'src/data/paths-more.js',
+  'src/data/details-os-net.js',
+  'src/data/details-backend.js',
+  'src/data/details-web.js',
+  'src/data/details-data-ai.js',
+  'src/data/details-infra-embedded.js',
+  'src/data/details-lang-arch.js',
+  'src/data/details-extra.js'
 ].forEach(f => vm.runInContext(read(f), ctx));
 
 const KB = ctx.KB;
@@ -106,6 +115,38 @@ for (const t of Object.keys(KB.TRACKS)) {
   if (c < 3) warnings.push(`方向「${t}」只有 ${c} 个节点`);
 }
 
+/* 学习路线：id 唯一、节点存在、步骤不为空 */
+const pathIds = new Set();
+for (const p of (KB.PATHS || [])) {
+  if (!p.id) err('路线缺少 id: ' + JSON.stringify(p).slice(0, 40));
+  if (pathIds.has(p.id)) err('重复路线 id: ' + p.id);
+  pathIds.add(p.id);
+  if (!p.name) err('路线缺少 name: ' + p.id);
+  if (!Array.isArray(p.steps) || p.steps.length < 3) err('路线步骤太少: ' + p.id);
+  else p.steps.forEach((st, i) => {
+    if (!st.phase) err(`路线 ${p.id} 第 ${i + 1} 步缺少 phase`);
+    if (!st.title && !st.node) err(`路线 ${p.id} 第 ${i + 1} 步缺少 title/node`);
+    if (st.node && !ids.has(st.node)) err(`路线 ${p.id} 第 ${i + 1} 步引用了不存在的节点: ${st.node}`);
+  });
+}
+
+/* 节点内部详细拆解：节点存在、分区与条目完整 */
+let detailItems = 0;
+const detailIds = new Set();
+for (const [id, d] of Object.entries(KB.DETAILS || {})) {
+  if (!ids.has(id)) { err('详细拆解引用了不存在的节点: ' + id); continue; }
+  detailIds.add(id);
+  if (!d || !Array.isArray(d.groups) || !d.groups.length) { err('详细拆解没有分区: ' + id); continue; }
+  d.groups.forEach((g, gi) => {
+    if (!g.name) err(`详细拆解 ${id} 第 ${gi + 1} 个分区缺少 name`);
+    if (!Array.isArray(g.items) || !g.items.length) err(`详细拆解 ${id} 分区「${g.name}」没有条目`);
+    (g.items || []).forEach(it => {
+      if (!it || !it.name) err(`详细拆解 ${id} 有缺少 name 的条目`);
+      else detailItems++;
+    });
+  });
+}
+
 const degs = Object.values(deg).sort((a, b) => a - b);
 const stat = {
   nodes: nodes.length,
@@ -114,7 +155,11 @@ const stat = {
   tracks: Object.keys(KB.TRACKS).length,
   children: nodes.reduce((s, n) => s + (n.children || []).length, 0),
   keywords: nodes.reduce((s, n) => s + (n.keywords || []).length, 0),
-  degree: { min: degs[0], median: degs[Math.floor(degs.length / 2)], max: degs[degs.length - 1] }
+  degree: { min: degs[0], median: degs[Math.floor(degs.length / 2)], max: degs[degs.length - 1] },
+  paths: (KB.PATHS || []).length,
+  pathSteps: (KB.PATHS || []).reduce((s, p) => s + p.steps.length, 0),
+  detailNodes: detailIds.size,
+  detailItems
 };
 
 console.log('数据概览:', JSON.stringify(stat, null, 0));

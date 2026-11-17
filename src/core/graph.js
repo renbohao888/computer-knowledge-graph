@@ -6,13 +6,37 @@ window.KB = window.KB || {};
 
 /* ---------- 样式访问器 ---------- */
 KB.nodeSize = function (n) {
-  const base = 1.2 + Math.min(n._deg || 0, 8) * 0.9;
+  const s = n._s == null ? 1 : n._s;                   // 逐帧缓动的缩放，避免选中时"啪"地变大
+  const base = (1.2 + Math.min(n._deg || 0, 8) * 0.9) * s;
   const sel = KB.state.selected;
   if (!sel) return base;
-  if (n.id === sel) return base * 1.9;                 // 中心的点放大
+  if (n.id === sel) return base * 1.12;
   const nb = KB.neighborMap.get(sel) || [];
-  if (nb.some(e => e.id === n.id)) return base * 1.35;  // 直接相连的略大
+  if (nb.some(e => e.id === n.id)) return base * 1.06;
   return base;
+};
+
+KB.stepNodeScale = function () {
+  const st = KB.state;
+  const list = st.subOf ? (KB.subNodes || []) : KB.NODES;
+  const nb = (!st.subOf && st.selected)
+    ? new Set((KB.neighborMap.get(st.selected) || []).map(e => e.id)) : null;
+  for (let i = 0; i < list.length; i++) {
+    const n = list[i];
+    let target = 1;
+    if (st.subOf) {
+      if (n._center || n._anchor) target = 1;
+      else if (st.subChild === n.id) target = 1.5;
+      else if (st.hover === n.id) target = 1.18;
+    } else {
+      if (st.selected === n.id) target = 1.5;
+      else if (st.hover === n.id) target = 1.18;
+      else if (nb && nb.has(n.id)) target = 1.12;
+    }
+    const cur = n._s == null ? 1 : n._s;
+    const next = cur + (target - cur) * 0.16;
+    n._s = Math.abs(next - target) < 0.002 ? target : next;
+  }
 };
 
 KB.colorOfNode = function (n) {
@@ -27,6 +51,14 @@ KB.colorOfNode = function (n) {
     return KB.fade(KB.TRACKS[s.track].color, t != null ? t : 0.2);
   }
   const base = KB.STATUS_COLOR[KB.effStatus(n)] || '#9fb3cc';
+
+  /* 学习路线模式：只点亮这条链路上的节点 */
+  if (s.path) {
+    const inPath = KB._pathSet && KB._pathSet.has(n.id);
+    if (!inPath) return KB.fade(base, 0.87);
+    if (s.selected === n.id) return base;
+    return base;
+  }
 
   if (s.focus) {
     if (!KB.inFocusSet(n.id)) return KB.fade(base, 0.86);
@@ -49,15 +81,24 @@ KB.colorOfNode = function (n) {
 };
 
 KB.colorOfLink = function (l) {
-  if (l.learn) return KB.learnVisible(l) ? KB.fade('#d9b45a', 0.3) : KB.BG;
   const s = KB.idOf(l.source), t = KB.idOf(l.target);
+  /* 学习路线模式：只留链路两端都在路线上的连线 */
+  if (KB.state.path) {
+    const A = KB.byId[s], B = KB.byId[t];
+    const inA = A && KB._pathSet && KB._pathSet.has(s);
+    const inB = B && KB._pathSet && KB._pathSet.has(t);
+    if (!(inA && inB)) return KB.BG;
+    return l.learn ? KB.fade('#d9b45a', 0.32) : KB.fade('#5cc8ff', 0.5);
+  }
+  if (l.learn) return KB.learnVisible(l) ? KB.fade('#d9b45a', 0.3) : KB.BG;
   if (KB.isHotLink(l)) return KB.LINK_HOT;
   const a = KB.byId[s], b = KB.byId[t];
   if (KB.state.track) {
     const inA = a && a.tracks.includes(KB.state.track);
     const inB = b && b.tracks.includes(KB.state.track);
     if (inA && inB) return KB.fade(KB.TRACKS[KB.state.track].color, 0.5);
-    return KB.fade(KB.LINK_BASE, 0.9);
+    /* 不在本方向的连线直接隐掉，避免出现"有线条、线头却没有节点" */
+    return KB.BG;
   }
   if (KB.state.focus && !(KB.inFocusSet(s) && KB.inFocusSet(t))) return KB.fade(KB.LINK_BASE, 0.86);
   if (KB.state.selected && !KB.isHotLink(l)) return KB.fade(KB.LINK_BASE, 0.82);
@@ -66,6 +107,12 @@ KB.colorOfLink = function (l) {
 };
 
 KB.particleCount = function (l) {
+  if (KB.state.path) {
+    const s = KB.idOf(l.source), t = KB.idOf(l.target);
+    const A = KB.byId[s], B = KB.byId[t];
+    if (!(A && B && KB._pathSet && KB._pathSet.has(s) && KB._pathSet.has(t))) return 0;
+    return l.learn ? 3 : 1;
+  }
   if (l.learn) return KB.learnVisible(l) ? 3 : 0;
   const s = KB.idOf(l.source), t = KB.idOf(l.target);
   if (KB.state.track) {
@@ -80,6 +127,128 @@ KB.particleCount = function (l) {
   if (!KB.matches(KB.byId[s]) || !KB.matches(KB.byId[t])) return 0;
   return KB.isHotLink(l) ? 4 : 1;
 };
+
+/* ---------- 3D 布局 ----------
+ * plane：13 层钉在水平面上，最扁平，层与层一眼可分
+ * helix：每层变成一圈，按层从下往上叠成螺旋塔，侧面看有真实的纵深
+ * free ：不钉层高，纯力导向，像星云；层只做很弱的纵向引导
+ * 三种布局共用同一套节点/连线，切换只改 fy 和两个自定义力。
+ */
+KB.LAYOUT_NAMES = { plane: '分层平面', helix: '立体螺旋', free: '自由星云' };
+const LAYOUT_KEY = 'kb.layout.v1';
+
+function layerIdx(n) {
+  const i = KB.LAYERS.indexOf(n.layer);
+  return i < 0 ? 0 : i;
+}
+
+function layoutGap(layout) {
+  if (layout === 'helix') return 92;   // 螺旋塔矮一点、宽一点，横向才有纵深
+  if (layout === 'free') return 108;
+  return KB.LAYER_GAP;
+}
+
+function layerBaseY(i, layout) {
+  return (i - (KB.LAYERS.length - 1) / 2) * layoutGap(layout);
+}
+
+/* 每层一圈：半径按层号做纺锤形（两端窄、中间宽），层与层之间错开角度，
+   相邻层的节点不会在一条竖直线上，从任何角度看都有层次。 */
+function ringTargets() {
+  const N = KB.LAYERS.length;
+  const groups = new Map(KB.LAYERS.map(l => [l, []]));
+  KB.NODES.forEach(n => {
+    const arr = groups.get(KB.LAYERS[layerIdx(n)]);
+    if (arr) arr.push(n);
+  });
+  groups.forEach(arr => arr.sort((a, b) =>
+    a.domain === b.domain ? (a.id < b.id ? -1 : 1) : (a.domain < b.domain ? -1 : 1)
+  ));
+  const out = new Map();
+  groups.forEach((arr, layer) => {
+    const gi = KB.LAYERS.indexOf(layer);
+    const t = N > 1 ? gi / (N - 1) : 0;
+    const R = 210 + 320 * Math.pow(Math.sin(Math.PI * t), 0.9);
+    const rot = gi * 0.62;
+    /* 每层不是一圈空心环，而是从中心旋出的螺旋臂：
+       半径随序号从内到外展开，角度转 1.2 圈，盘子更"实"，
+       钻进模型内部时四周也有节点，不至于一片空。 */
+    arr.forEach((n, idx) => {
+      const f = arr.length === 1 ? 0.7 : (idx + 0.5) / arr.length;
+      const rad = 70 + (R - 70) * Math.pow(f, 0.75);
+      const a = rot + f * Math.PI * 2.4;
+      out.set(n.id, { x: Math.cos(a) * rad, z: Math.sin(a) * rad });
+    });
+  });
+  return out;
+}
+
+KB.applyLayout = function (layout, opts) {
+  if (!KB.LAYOUT_NAMES[layout]) layout = 'helix';
+  KB.state.layout = layout;
+  try { localStorage.setItem(LAYOUT_KEY, layout); } catch (e) { /* 隐私模式 */ }
+
+  const rings = ringTargets();
+  /* 模型半径：后面限制"穿行"时镜头别飞太远 */
+  let cloudR = 0;
+  rings.forEach(p => { cloudR = Math.max(cloudR, Math.hypot(p.x, p.z)); });
+  const midY = Math.abs(layerBaseY(0, layout));
+  KB._cloudR = Math.max(cloudR, midY) + 120;
+  KB.NODES.forEach(n => {
+    n._baseY = layerBaseY(layerIdx(n), layout);
+    n._ring = rings.get(n.id) || { x: 0, z: 0 };
+    n.vx = n.vy = n.vz = 0;
+    if (layout === 'free') {
+      n.fy = null;
+      n.y = n._baseY;
+      if (opts && opts.reposition) { n.x = n._ring.x; n.z = n._ring.z; }
+    } else {
+      n.fy = n._baseY;
+      if (layout === 'helix') {
+        n.y = n._baseY;
+        n.x = n._ring.x;
+        n.z = n._ring.z;
+      }
+    }
+  });
+
+  if (KB.graph && KB._graphReady) {
+    /* 自由星云需要更大的斥力把节点摊开，才有星云那种体积感 */
+    const charge = KB.graph.d3Force('charge');
+    if (charge) charge.strength(layout === 'free' ? -1050 : -820).distanceMax(1800);
+    KB.graph.d3ReheatSimulation();
+    if (!(opts && opts.fit === false)) {
+      const target = layout;
+      setTimeout(() => { if (KB.state.layout === target) KB.fitView(); }, 900);
+    }
+  }
+};
+
+/* 三个布局力：每个只在自己那一档生效，注册一次即可 */
+function forceZ(alpha) {
+  if (KB.state.layout !== 'plane') return;
+  const k = 0.22 * alpha;
+  for (let i = 0; i < KB.NODES.length; i++) KB.NODES[i].vz += (0 - KB.NODES[i].z) * k;
+}
+function forceRing(alpha) {
+  if (KB.state.layout !== 'helix') return;
+  const k = 0.45 * alpha;
+  for (let i = 0; i < KB.NODES.length; i++) {
+    const n = KB.NODES[i];
+    if (!n._ring) continue;
+    n.vx += (n._ring.x - n.x) * k;
+    n.vz += (n._ring.z - n.z) * k;
+  }
+}
+function forceYSoft(alpha) {
+  if (KB.state.layout !== 'free') return;
+  const k = 0.035 * alpha;
+  for (let i = 0; i < KB.NODES.length; i++) {
+    const n = KB.NODES[i];
+    n.vy += (n._baseY - n.y) * k;
+  }
+}
+forceZ.initialize = forceRing.initialize = forceYSoft.initialize = () => {};
 
 /* ---------- 初始化 ---------- */
 KB.initGraph = function () {
@@ -105,31 +274,221 @@ KB.initGraph = function () {
     .onBackgroundClick(KB.handleBackgroundClick)
     .onEngineStop(KB.handleEngineStop);
 
-  g.d3Force('charge').strength(-820).distanceMax(1500);
+  g.d3Force('charge').strength(-820).distanceMax(1800);
   g.d3Force('link')
-    .distance(l => l.learn ? 40 : (KB.sameLayerLink(l) ? 85 : 150))
+    .distance(l => {
+      if (l.learn) return 40;
+      const free = KB.state.layout === 'free';
+      if (KB.sameLayerLink(l)) return free ? 105 : 85;
+      return free ? 180 : 150;
+    })
     .strength(l => l.learn ? 0 : 0.4);    // 学习路径不参与布局
 
-  /* 把节点往 z=0 拉，让每一层尽量落在同一个深度平面上。
-     否则斜视角下层与层会互相穿插，刻度也对不齐。 */
-  const forceZ = (alpha) => {
-    const k = 0.22 * alpha;
-    for (let i = 0; i < KB.NODES.length; i++) {
-      KB.NODES[i].vz += (0 - KB.NODES[i].z) * k;
-    }
-  };
-  forceZ.initialize = () => {};
+  /* 三种布局各注册一个力，布局切换只靠 state.layout 决定谁生效 */
   g.d3Force('z', forceZ);
+  g.d3Force('ring', forceRing);
+  g.d3Force('ysoft', forceYSoft);
 
   g.d3AlphaDecay(0.026).warmupTicks(70).cooldownTicks(170);
 
   /* 偏广一点的视角 + 斜方位，透视更强，模型看起来才有立体感 */
   if (g.camera()) { g.camera().fov = 55; g.camera().updateProjectionMatrix(); }
-  g.cameraPosition({ x: 480, y: 320, z: 1300 }, { x: 0, y: 0, z: 0 }, 0);
+  g.cameraPosition({ x: 860, y: 420, z: 1080 }, { x: 0, y: 0, z: 0 }, 0);
+
+  /* 滚轮分两段：先把镜头推到最近距离，之后继续滚就是"向前穿行"，
+     左键拖拽转向、右键拖拽平移。手机双指缩放仍走 OrbitControls。 */
+  KB.installWheelControl(g);
 
   KB.graph = g;
+
+  /* 上次用的布局（默认立体螺旋），先摆好初始坐标再灌数据 */
+  let saved = 'helix';
+  try { saved = localStorage.getItem(LAYOUT_KEY) || 'helix'; } catch (e) { /* 隐私模式 */ }
+  KB.applyLayout(saved, { fit: false });
+  const ls = document.getElementById('layoutSelect');
+  if (ls) ls.value = saved;
+
   g.graphData({ nodes: KB.NODES, links: KB.graphLinks });
+  KB._graphReady = true;
   return g;
+};
+
+/* 布局切换入口：右上角「布局」下拉框调用 */
+KB.setLayout = function (layout) {
+  if (KB.state.subOf) KB.exitSubModel(true);
+  KB.applyLayout(layout, { reposition: true });
+  const ls = document.getElementById('layoutSelect');
+  if (ls) ls.value = layout;
+  KB.showToast('布局：' + (KB.LAYOUT_NAMES[layout] || layout));
+};
+
+/* 滚轮：先缩放，贴近后转为穿行。
+   镜头不是每个滚轮事件瞬移一步，而是维护一个"目标位置"，
+   每一帧向它做指数缓动，所以在低滚轮事件频率下也始终是平滑的。
+   缩放到"最近视距"（STOP_DIST）之前，滚轮改变镜头与注视点的距离；
+   之后继续向前，镜头和注视点一起沿视线前移，像走进模型内部。
+   向后滚动时原路退回，退到边界会掉头看向模型中心。
+   手机的双指缩放不受影响。 */
+KB.installWheelControl = function (g) {
+  const canvas = g.renderer().domElement;
+  const controls = g.controls();
+  const cam = g.camera();
+  if (!canvas || !controls || !cam) return;
+
+  /* 让 OrbitControls 不再自己处理滚轮（否则会和我们重复放大），
+     但保留它的触摸缩放。 */
+  if (controls._onMouseWheel) canvas.removeEventListener('wheel', controls._onMouseWheel);
+
+  const STOP_DIST = 150;   // 放大到这里就停住，改为穿行
+  const MAX_DIST = 4200;
+  const TIME_CONST = 0.16; // 缓动时间常数（秒），越小越跟手
+  const want = { pos: cam.position.clone(), target: controls.target.clone() };
+  const dir = cam.position.clone();
+  const aim = cam.position.clone();
+  let flying = false;      // 是否已经在"穿行"阶段
+  let easing = false;
+  let rafId = 0;
+  let lastT = 0;
+  let fxTimer = 0;
+
+  const magOf = (deltaY) => Math.min(1.6, Math.max(0.4, Math.abs(deltaY) / 120));
+  const stepOf = (r, mag) => Math.min(180, Math.max(26, r * 0.4)) * mag;
+
+  function syncWant() {
+    want.pos.copy(cam.position);
+    want.target.copy(controls.target);
+  }
+
+  function stopEase() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    easing = false;
+  }
+
+  function easeStep(now) {
+    if (!easing) return;
+    const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000));
+    lastT = now;
+    const k = 1 - Math.exp(-dt / TIME_CONST);
+    cam.position.lerp(want.pos, k);
+    controls.target.lerp(want.target, k);
+    controls.update();
+    if (cam.position.distanceTo(want.pos) > 0.4 || controls.target.distanceTo(want.target) > 0.4) {
+      rafId = requestAnimationFrame(easeStep);
+    } else {
+      cam.position.copy(want.pos);
+      controls.target.copy(want.target);
+      controls.update();
+      rafId = 0;
+      easing = false;
+    }
+  }
+
+  function runEase() {
+    if (easing) return;
+    easing = true;
+    lastT = performance.now();
+    rafId = requestAnimationFrame(easeStep);
+  }
+
+  /* 飞行期间把 HTML 标签层藏起来：少掉每帧 300 多个 DOM 重排，画面更稳 */
+  function markFlight() {
+    KB._flying = true;
+    document.body.classList.add('flying-view');
+    clearTimeout(fxTimer);
+    fxTimer = setTimeout(() => {
+      KB._flying = false;
+      document.body.classList.remove('flying-view');
+    }, 280);
+  }
+
+  /* 用户手动拖拽时立刻停下缓动，交给 OrbitControls */
+  function cancelFly() {
+    stopEase();
+    flying = false;      // 相机被外部重置（取景/选方向）后，下次滚轮重新从"缩放"开始
+    syncWant();
+    KB._flying = false;
+    document.body.classList.remove('flying-view');
+    clearTimeout(fxTimer);
+  }
+  KB._cancelFly = cancelFly;
+  canvas.addEventListener('pointerdown', cancelFly, { passive: true });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (!easing) syncWant();   // 缓动结束后从真实镜头状态出发；缓动中则继续累加目标
+
+    const r = want.pos.distanceTo(want.target);
+    if (!isFinite(r) || r <= 0) return;
+    /* 相机被取景搬远后，之前的"穿行"状态作废，先恢复缩放 */
+    if (flying && r > STOP_DIST + 2) flying = false;
+    dir.subVectors(want.target, want.pos).normalize();
+    const mag = magOf(e.deltaY);
+
+    if (e.deltaY < 0) {
+      /* 向前：还远就先缩小视距，贴近后改为前移 */
+      if (!flying && r > STOP_DIST + 1) {
+        const r2 = Math.max(STOP_DIST, r * Math.exp(-mag * 0.42));
+        want.pos.addScaledVector(dir, r - r2);
+      } else {
+        KB._subOutHits = 0;
+        if (!flying && !KB._flyHinted) {
+          KB._flyHinted = true;
+          KB.showToast('已进入穿行：滚轮前后移动 · 左键转向 · 右键平移');
+        }
+        flying = true;
+        const step = stepOf(r, mag);
+        /* 第一人称直线前进：不自动拐弯，只保留最外圈的软边界 */
+        const next = want.pos.clone().addScaledVector(dir, step);
+        const limit = (KB._cloudR || 900) + 260;
+        if (next.length() <= limit) {
+          want.pos.copy(next);
+          want.target.addScaledVector(dir, step);
+        } else {
+          /* 到边界：把视线转回模型中心，让穿行能继续，而不是卡住不动 */
+          const inward = want.pos.clone().negate().normalize();
+          want.target.copy(want.pos).addScaledVector(inward, Math.max(STOP_DIST, r));
+          const now = performance.now();
+          if (!KB._edgeNoteAt || now - KB._edgeNoteAt > 2600) {
+            KB._edgeNoteAt = now;
+            KB.showToast('已到模型边界：自动转向中心，可继续滚轮前进或后退');
+          }
+        }
+      }
+    } else {
+      /* 向后：穿行阶段就沿原路后退；退到模型边界掉头，之后恢复常规缩放 */
+      if (flying) {
+        const step = stepOf(r, mag);
+        const next = want.pos.clone().addScaledVector(dir, -step);
+        const limit = (KB._cloudR || 900) + 100;
+        if (next.length() > limit) {
+          flying = false;
+          const inward = want.pos.clone().negate().normalize();
+          want.target.copy(want.pos).addScaledVector(inward, Math.max(STOP_DIST, r));
+        } else {
+          want.pos.copy(next);
+          want.target.addScaledVector(dir, -step);
+        }
+      } else {
+        let r2 = Math.min(MAX_DIST, r * Math.exp(mag * 0.38));
+        if (KB.state.subOf && KB._subEnterDist) {
+          const enterD = KB._subEnterDist;
+          /* 先收回子模型根视图；已经在根视图还继续缩，才退回这个节点的聚焦视图 */
+          if (r > enterD * 1.02) {
+            r2 = Math.min(r2, enterD);
+          } else if (r2 > enterD * 1.15) {
+            KB._subOutHits = (KB._subOutHits || 0) + 1;
+            if (KB._subOutHits >= 2) { KB.leaveSubToNode(); return; }
+            r2 = enterD;
+          }
+        }
+        want.pos.addScaledVector(dir, -(r2 - r));
+      }
+    }
+
+    runEase();
+    markFlight();
+  }, { passive: false });
 };
 
 KB.sameLayerLink = function (l) {
@@ -140,6 +499,7 @@ KB.sameLayerLink = function (l) {
 /* 重新推一遍样式（3D 属性访问器每帧都会重算，这里保证即时生效） */
 KB.refreshStyles = function () {
   if (!KB.graph) return;
+  if (KB.state.subOf) return;   // 节点内部 3D 有自己的样式访问器
   KB.graph
     .nodeColor(KB.colorOfNode)
     .linkColor(KB.colorOfLink)
@@ -159,6 +519,7 @@ KB.clearHover = function () {
    视觉上就是整个立体模型转过来，把这个模块转到你面前。 */
 KB.orbitTo = function (node, ms) {
   if (!KB.graph || !node) return;
+  if (KB._cancelFly) KB._cancelFly();
   const cam = KB.graph.camera();
   if (!cam) return;
   KB.clearHover();
@@ -218,10 +579,11 @@ KB.orbitTo = function (node, ms) {
     const rx = -fz, rz = fx;               // right = cross(forward, up)
 
     const panelEl = document.getElementById('panel');
-    const panelOpen = panelEl && panelEl.classList.contains('open') && window.innerWidth > 900;
     const wide = window.innerWidth > 900;
+    const panelOpen = panelEl && panelEl.classList.contains('open') && wide
+      && !document.body.classList.contains('panel-collapsed');
     const panelW = panelOpen ? 480 : 0;
-    const railW = wide ? 290 : 0;          // 左侧栏也占位置，节点要放在它右侧
+    const railW = (wide && !document.body.classList.contains('rail-collapsed')) ? 290 : 0;
     const worldPerPx = (2 * Math.tan(fov / 2) * r) / window.innerHeight;
     const shift = ((panelW - railW) / 2) * worldPerPx;
 
@@ -259,6 +621,7 @@ KB.orbitTo = function (node, ms) {
 /* 沿当前视角推进（备用：需要保持方位时用） */
 KB.flyTo = function (node, ms) {
   if (!KB.graph || !node) return;
+  if (KB._cancelFly) KB._cancelFly();
   KB.clearHover();
   const dist = 330 + (node._deg || 4) * 10;
   const cam = KB.graph.cameraPosition();
@@ -276,6 +639,7 @@ KB.flyTo = function (node, ms) {
 /* 搜索定位：绕 Y 轴偏一点再拉近，像用手把星图拨过去 */
 KB.flyToSearch = function (node) {
   if (!KB.graph || !node) return;
+  if (KB._cancelFly) KB._cancelFly();
   KB.clearHover();
   const cam = KB.graph.cameraPosition();
   const az = Math.atan2((cam.x || 0) - node.x, (cam.z || 0) - node.z) + 0.55;
@@ -294,8 +658,32 @@ KB.flyToSearch = function (node) {
 
 /* 屏幕空间取景：按投影后的包围盒填满画面。
    zoomToFit 按包围球算，节点一多景深会浪费大半个屏幕。 */
+/* 面板/左栏占位用"相机视口偏移"处理：旋转中心仍是模型中心，
+   不会因为避让面板把轨道中心带到一边。 */
+KB.viewOffsetPx = function () {
+  const W = window.innerWidth;
+  if (W <= 900) return 0;
+  const panelEl = document.getElementById('panel');
+  const panelOpen = panelEl && panelEl.classList.contains('open')
+    && !document.body.classList.contains('panel-collapsed');
+  const railOpen = !document.body.classList.contains('rail-collapsed');
+  return (panelOpen ? 480 : 0) - (railOpen ? 290 : 0);
+};
+
+KB.updateViewOffset = function (extraPx) {
+  if (!KB.graph) return;
+  const cam = KB.graph.camera();
+  if (!cam) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  const off = Math.round(KB.viewOffsetPx() / 2 + (extraPx || 0));
+  if (Math.abs(off) >= 1) cam.setViewOffset(W, H, off, 0, W, H);
+  else cam.clearViewOffset();
+  cam.updateProjectionMatrix();
+};
+
 KB.fitNodes = function (nodes, ms) {
   if (!KB.graph) return;
+  if (KB._cancelFly) KB._cancelFly();
   const ns = (nodes || []).filter(n => n && n.__threeObj);
   if (!ns.length) return;
   const cam = KB.graph.camera();
@@ -311,28 +699,52 @@ KB.fitNodes = function (nodes, ms) {
   let dist = Math.hypot(ux, uy, uz) || 600;
   ux /= dist; uy /= dist; uz /= dist;
 
+  /* 取景区域：让开左侧栏与右侧详情面板，只把节点铺满可见区。
+     位置偏移交给视口偏移，target 始终是模型中心，拖动旋转不会跑偏。 */
+  const W = window.innerWidth, H = window.innerHeight;
+  const panelEl = document.getElementById('panel');
+  const wide = W > 900;
+  const panelOpen = wide && panelEl && panelEl.classList.contains('open')
+    && !document.body.classList.contains('panel-collapsed');
+  const railOpen = wide && !document.body.classList.contains('rail-collapsed');
+  const padPx = 36;
+  const freeXMin = -1 + 2 * ((railOpen ? 290 : 0) + padPx) / W;
+  const freeXMax = 1 - 2 * ((panelOpen ? 480 : 0) + padPx) / W;
+  const freeYSpan = 1.8;
+
   const v = cam.position.clone();
-  for (let i = 0; i < 6; i++) {
+  const setCam = (extraOff) => {
     cam.position.set(cx + ux * dist, cy + uy * dist, cz + uz * dist);
     cam.lookAt(cx, cy, cz);
+    KB.updateViewOffset(extraOff);
     cam.updateMatrixWorld(true);
-    cam.updateProjectionMatrix();
+  };
 
-    let maxN = 0, behind = 0;
+  let extraOff = 0;
+  for (let i = 0; i < 14; i++) {
+    setCam(extraOff);
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, behind = 0;
     for (let j = 0; j < ns.length; j++) {
       v.copy(ns[j].__threeObj.position).project(cam);
-      /* 在相机后面的点会被跳过，但那样会取景过近，
-         所以一旦发现有节点在背后，就把相机往后退。 */
       if (!isFinite(v.x) || !isFinite(v.y) || v.z > 1) { behind++; continue; }
-      const ax = Math.abs(v.x), ay = Math.abs(v.y);
-      if (ax > maxN) maxN = ax;
-      if (ay > maxN) maxN = ay;
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
     }
     if (behind) { dist *= 1.6; continue; }
-    if (maxN < 0.001) break;
-    dist = Math.max(120, dist * maxN / 0.86);
+    const spanX = Math.max(1e-6, maxX - minX);
+    const spanY = Math.max(1e-6, maxY - minY);
+    const freeSpanX = Math.max(0.2, freeXMax - freeXMin);
+    const need = Math.max(spanX / freeSpanX, spanY / freeYSpan);
+    if (need > 0.98) { dist = Math.max(120, dist * Math.min(3, need * 1.03)); continue; }
+
+    const dxPx = ((minX + maxX) / 2 - (freeXMin + freeXMax) / 2) * (W / 2);
+    if (Math.abs(dxPx) > 2) { extraOff += dxPx; continue; }
+    break;
   }
 
+  KB.updateViewOffset(extraOff);
   KB.graph.cameraPosition(
     { x: cx + ux * dist, y: cy + uy * dist, z: cz + uz * dist },
     { x: cx, y: cy, z: cz },

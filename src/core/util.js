@@ -26,3 +26,15 @@ KB.fade = function (color, t) {
   const r = a.map((v, i) => Math.round(v + (b[i] - v) * t));
   return `rgb(${r[0]},${r[1]},${r[2]})`;
 };
+
+/* 场景切换（总图 ⇄ 节点内部）时短暂淡出，避免数据一换画面硬切 */
+KB.withSceneFade = function (fn, ms) {
+  const b = document.body;
+  if (!b) { fn(); return; }
+  b.classList.add('scene-fade');
+  setTimeout(() => {
+    try { fn(); } finally {
+      requestAnimationFrame(() => b.classList.remove('scene-fade'));
+    }
+  }, ms == null ? 150 : ms);
+};

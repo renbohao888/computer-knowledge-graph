@@ -45,7 +45,9 @@ function showBootError() {
 function frame() {
   requestAnimationFrame(frame);
   if (!KB.graph) return;
+  if (KB.stepNodeScale) KB.stepNodeScale();  // 节点缩放的逐帧缓动
   if (KB.state.mode !== '3d') return;   // 2D 关系图时不更新 3D 标签
+  if (KB._flying) return;               // 滚轮穿行时标签层隐藏，省掉逐帧重排
   const cam = KB.graph.camera();
   if (!cam) return;
   KB.tickLabels(cam);
@@ -67,6 +69,7 @@ KB.boot = function () {
   KB.bindPanel();
   KB.bindSearch();
   KB.bindRail();
+  if (KB.bindPaths) KB.bindPaths();
 
   KB.initGraph();
   KB.buildLabels();
