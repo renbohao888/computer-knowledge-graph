@@ -83,7 +83,7 @@ KB.particleCount = function (l) {
 
 /* ---------- 初始化 ---------- */
 KB.initGraph = function () {
-  const g = ForceGraph3D({ controlType: 'trackball' })(document.getElementById('graph'));
+  const g = ForceGraph3D({ controlType: 'orbit' })(document.getElementById('graph'));
 
   g.backgroundColor(KB.BG)
     .showNavInfo(false)
@@ -350,5 +350,5 @@ KB.fitSubset = function (ids) {
 
 KB.setCursor = function (c) {
   const el = document.querySelector('#graph canvas');
-  if (el) el.style.cursor = c;
+  if (el) el.style.cursor = KB.state.panMode ? 'move' : c;
 };

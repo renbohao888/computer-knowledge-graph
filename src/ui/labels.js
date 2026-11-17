@@ -277,6 +277,9 @@ KB.updateAxis = function (cam) {
 
   /* 用层中心 (0, layerY, 0) 投影：世界坐标的 y 是有序的，
      所以刻度永远按顺序排列，相当于一把标尺。 */
+  /* 层与层在屏幕上靠得太近（或上下顺序被打乱）时，只保留放得下的，
+     否则左下角会糊成一团 */
+  let lastY = -Infinity;
   KB.LAYERS.forEach(l => {
     const el = axisRows.get(l);
     if (!el) return;
@@ -286,7 +289,14 @@ KB.updateAxis = function (cam) {
       el.classList.remove('active');
       return;
     }
-    el.style.top = ((-axisVec.y * 0.5 + 0.5) * h).toFixed(1) + 'px';
+    const y = (-axisVec.y * 0.5 + 0.5) * h;
+    if (y - lastY < 14) {
+      el.style.opacity = '0';
+      el.classList.remove('active');
+      return;
+    }
+    lastY = y;
+    el.style.top = y.toFixed(1) + 'px';
     el.style.opacity = '';
     el.classList.toggle('active', KB.state.layer === l);
   });
