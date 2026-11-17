@@ -16,6 +16,7 @@ window.KB = window.KB || {};
   let raf = 0;
   let drag = null;
   let focusIds = new Set();
+  let labelAbove = new Map();
 
   const idOf = (v) => (v && typeof v === 'object') ? v.id : v;
   const el = (tag, cls) => { const e = document.createElementNS(NS, tag); if (cls) e.setAttribute('class', cls); return e; };
@@ -95,24 +96,28 @@ window.KB = window.KB || {};
 
     const ring = before.length + after.length + rel.length;
     /* 半径不能超过可用区域，否则最外圈会被左栏或右面板挡住 */
-    const freeHalf = Math.min((W - panelW - railW) / 2 - 55, H / 2 - 90);
+    const freeHalf = Math.min((W - panelW - railW) / 2 - 50, H / 2 - 80);
     const R = narrow
-      ? Math.max(80, Math.min(140, 60 + ring * 8))
-      : Math.max(150, Math.min(freeHalf, 150 + ring * 18));
+      ? Math.max(90, Math.min(150, 70 + ring * 9))
+      : Math.max(210, Math.min(freeHalf, 210 + ring * 24));
 
     const target = new Map();
     target.set(id, { x: cx, y: cy });
     focusIds = new Set([id]);
 
+    labelAbove.clear();
     const place = (list, a0, a1) => list.forEach((nid, i) => {
       const a = list.length === 1 ? (a0 + a1) / 2 : a0 + (a1 - a0) * (i / (list.length - 1));
       const rad = a * Math.PI / 180;
       target.set(nid, { x: cx + Math.cos(rad) * R, y: cy + Math.sin(rad) * R });
       focusIds.add(nid);
+      /* 相邻节点的名字上下交错，避免挤在同一行 */
+      labelAbove.set(nid, i % 2 === 1);
     });
-    place(before, 120, 240);   // 左半圈：前置
-    place(after, -58, 58);     // 右半圈：后续
-    place(rel, 68, 112);       // 下方：其他关联
+    /* 三个区间之间留出空隙，避免相邻两组落在同一个角度上 */
+    place(before, 150, 210);   // 左半圈：前置
+    place(after, -45, 45);     // 右半圈：后续
+    place(rel, 62, 118);       // 下方：其他关联
 
     return target;
   }
@@ -136,7 +141,8 @@ window.KB = window.KB || {};
       c.setAttribute('fill', color2d(n));
 
       const t = g.lastChild;
-      t.setAttribute('y', (r + 14).toFixed(1));
+      const above = sel && !isCenter && labelAbove.get(n.id);
+      t.setAttribute('y', above ? (-r - 9).toFixed(1) : (r + 14).toFixed(1));
       t.style.opacity = (sel && !isCenter) ? '0.92' : '1';
     });
 
