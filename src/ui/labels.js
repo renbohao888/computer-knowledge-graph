@@ -44,6 +44,11 @@ KB.buildLabels = function () {
     edgeEls.push(el);
   });
 
+  /* 选中节点的光环 */
+  const ring = document.createElement('div');
+  ring.id = 'selRing';
+  layer.appendChild(ring);
+
   /* 文本宽度只需量一次 */
   requestAnimationFrame(() => {
     KB.NODES.forEach(n => {
@@ -86,6 +91,24 @@ KB.tickLabels = function (cam) {
   const w = window.innerWidth, h = window.innerHeight;
   boxes.length = 0;
 
+  /* 选中节点的光环 */
+  const ring = document.getElementById('selRing');
+  if (ring) {
+    const selNode = st.selected ? KB.byId[st.selected] : null;
+    if (selNode && selNode.__threeObj) {
+      if (!nodeVec) nodeVec = cam.position.clone();
+      nodeVec.copy(selNode.__threeObj.position).project(cam);
+      if (nodeVec.z < 1) {
+        ring.style.transform = `translate(${((nodeVec.x * 0.5 + 0.5) * w).toFixed(1)}px,${((-nodeVec.y * 0.5 + 0.5) * h).toFixed(1)}px) translate(-50%,-50%)`;
+        ring.classList.add('on');
+      } else {
+        ring.classList.remove('on');
+      }
+    } else {
+      ring.classList.remove('on');
+    }
+  }
+
   /* ---------- 节点名 ---------- */
   if (st.labels) {
     const items = [];
@@ -108,12 +131,14 @@ KB.tickLabels = function (cam) {
       else if (st.focus) { prio = 0; op = 0.1; }
       else if (st.selected) {
         const nb = KB.neighborMap.get(st.selected) || [];
-        if (nb.some(e => e.id === n.id)) { prio = 2; op = 0.72; }
-        else { prio = 0; op = 0.12; }
+        if (nb.some(e => e.id === n.id)) { prio = 3; op = 0.92; }
+        else { prio = 0; op = 0.05; }
       }
       else if (!KB.matches(n)) { prio = 0; op = 0.16; }
 
-      items.push({ n, el, x: p.x, y: p.y - 13, prio, op, hot: st.selected === n.id || st.hover === n.id });
+      /* 选中的点更大，名字抬高一点，别压在球和光环上 */
+      const yOff = (st.selected === n.id) ? -40 : -13;
+      items.push({ n, el, x: p.x, y: p.y + yOff, prio, op, hot: st.selected === n.id || st.hover === n.id });
     }
 
     if (KB._orbiting) {
@@ -168,8 +193,10 @@ KB.tickLabels = function (cam) {
     const len = Math.hypot(pa.x - pb.x, pa.y - pb.y);
     if (len < EDGE_MIN_LEN) { el.style.opacity = '0'; continue; }
 
+    /* 选中某个节点时，近距离的连线文字会互相压字、糊住中心，
+       关系已经列在右侧面板里，这里全部收起来。 */
+    if (st.selected) { el.style.opacity = '0'; continue; }
     const hot = KB.isHotLink(l);
-    if (st.selected && !hot) { el.style.opacity = '0'; continue; }
     cands.push({ el, x: p.x, y: p.y, len, hot, rel: l.relation || '' });
   }
 
@@ -209,10 +236,6 @@ KB.buildAxis = function () {
     const el = document.createElement('div');
     el.className = 'axis-row';
     el.innerHTML = `<span>${KB.esc(l)}</span><i></i>`;
-    el.querySelector('span').addEventListener('click', () => {
-      KB.state.layer = (KB.state.layer === l) ? null : l;
-      KB.syncFilterUI();
-    });
     box.appendChild(el);
     axisRows.set(l, el);
   });

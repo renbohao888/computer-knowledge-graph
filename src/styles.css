@@ -67,10 +67,7 @@ body.labels-off #labels{opacity:0}
 .axis-row span{
   flex:none;font-size:10px;color:#4f6080;letter-spacing:.04em;
   text-align:left;white-space:nowrap;
-  pointer-events:auto;cursor:pointer;padding:2px 4px;border-radius:4px;
-  transition:color .15s,background .15s;
 }
-.axis-row span:hover{color:#9fc9e8;background:rgba(92,200,255,.08)}
 .axis-row i{
   flex:none;width:34px;height:1px;
   background:repeating-linear-gradient(90deg,rgba(124,168,224,.16) 0 3px,transparent 3px 9px);
@@ -84,6 +81,19 @@ body.labels-off #labels{opacity:0}
   will-change:transform,opacity;transition:color .18s,opacity .18s;
 }
 .node-label.is-hot{color:#fff;font-weight:600}
+
+/* 选中节点的光环，跟随投影位置 */
+#selRing{
+  position:absolute;left:0;top:0;width:64px;height:64px;border-radius:50%;
+  border:1px solid rgba(92,200,255,.45);
+  box-shadow:0 0 18px rgba(92,200,255,.25), inset 0 0 14px rgba(92,200,255,.08);
+  transform:translate(-50%,-50%);opacity:0;transition:opacity .2s;pointer-events:none;
+}
+#selRing.on{opacity:1}
+#selRing::after{
+  content:'';position:absolute;inset:-9px;border-radius:50%;
+  border:1px solid rgba(92,200,255,.14);
+}
 
 /* —— 左侧：标题 + 分层栈 + 掌握度 —— */
 #rail{
