@@ -115,7 +115,7 @@ KB.initGraph = function () {
   forceZ.initialize = () => {};
   g.d3Force('z', forceZ);
 
-  g.d3AlphaDecay(0.02).warmupTicks(80).cooldownTicks(240);
+  g.d3AlphaDecay(0.026).warmupTicks(70).cooldownTicks(170);
 
   /* 偏广一点的视角 + 斜方位，透视更强，模型看起来才有立体感 */
   if (g.camera()) { g.camera().fov = 55; g.camera().updateProjectionMatrix(); }

@@ -22,8 +22,33 @@ KB.handleNodeClick = function (node) {
   }, 280);
 };
 
-KB.handleBackgroundClick = function () {
+/* 点空白处：
+   1. 先看看是不是点歪了——16px 内最近的节点也算点中（布局在动时很常见）
+   2. 真的点空才取消选中 */
+KB.nearestNodeToEvent = function (ev) {
+  if (!ev || !KB.graph) return null;
+  const cam = KB.graph.camera();
+  if (!cam) return null;
+  const w = window.innerWidth, h = window.innerHeight;
+  const v = cam.position.clone();
+  let best = null, bestD = 16;
+  for (let i = 0; i < KB.NODES.length; i++) {
+    const n = KB.NODES[i];
+    if (!n.__threeObj) continue;
+    v.copy(n.__threeObj.position).project(cam);
+    if (v.z > 1) continue;
+    const x = (v.x * 0.5 + 0.5) * w;
+    const y = (-v.y * 0.5 + 0.5) * h;
+    const d = Math.hypot(x - ev.clientX, y - ev.clientY);
+    if (d < bestD) { bestD = d; best = n; }
+  }
+  return best;
+};
+
+KB.handleBackgroundClick = function (ev) {
   if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; clickCandidate = null; }
+  const near = KB.nearestNodeToEvent(ev);
+  if (near) { KB.selectNode(near.id, true); return; }
   KB.clearSelection();
 };
 
@@ -43,7 +68,8 @@ KB.handleLinkHover = function (link) {
 KB.handleEngineStop = function () {
   if (didInitialFit) return;
   didInitialFit = true;
-  KB.fitView();
+  /* 首次取景直接到位，不做动画：否则头一秒画面在动，点击容易落空 */
+  KB.fitNodes(KB.NODES, 0);
 };
 
 /* 每个知识点都有自己的地址：#/redis，可以直接分享或刷新回到这一页 */
