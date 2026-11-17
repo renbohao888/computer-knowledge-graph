@@ -169,20 +169,6 @@ KB.bindRail = function () {
     });
   }
 
-  const panBtn = document.getElementById('panBtn');
-  if (panBtn) {
-    panBtn.addEventListener('click', () => {
-      const on = panBtn.getAttribute('aria-pressed') !== 'true';
-      panBtn.setAttribute('aria-pressed', String(on));
-      KB.state.panMode = on;
-      const controls = KB.graph && KB.graph.controls && KB.graph.controls();
-      if (controls && controls.mouseButtons) {
-        controls.mouseButtons.LEFT = on ? 2 : 0;   // 2 = PAN, 0 = ROTATE
-      }
-      KB.setCursor(on ? 'move' : 'grab');
-    });
-  }
-
   const resetBtn = document.getElementById('resetBtn');
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {

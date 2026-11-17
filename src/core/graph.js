@@ -350,5 +350,5 @@ KB.fitSubset = function (ids) {
 
 KB.setCursor = function (c) {
   const el = document.querySelector('#graph canvas');
-  if (el) el.style.cursor = KB.state.panMode ? 'move' : c;
+  if (el) el.style.cursor = c;
 };
