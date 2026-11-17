@@ -10,6 +10,10 @@ window.KB = window.KB || {};
   const LS_KEY = 'kb.articles.v1';
   const API = 'api/content';
 
+  /* 纯静态托管（GitHub Pages、file://）没有内容 API，直接走本机存储，
+     免得多打一条必然 404 的请求。 */
+  const STATIC_HOST = location.protocol === 'file:' || /\.github\.io$/i.test(location.hostname);
+
   /* 仓库里自带的教程，用于"恢复原版" */
   const BUNDLED = Object.assign({}, KB.ARTICLES);
   KB.BUNDLED_ARTICLES = BUNDLED;
@@ -55,10 +59,12 @@ window.KB = window.KB || {};
   KB.loadUserContent = async function () {
     let server = null;
     try {
-      const r = await KB.fetchTimeout(API, { cache: 'no-store' }, 3000);
-      if (r.ok) {
-        const j = await r.json();
-        if (j && j.articles && typeof j.articles === 'object') server = j.articles;
+      if (!STATIC_HOST) {
+        const r = await KB.fetchTimeout(API, { cache: 'no-store' }, 3000);
+        if (r.ok) {
+          const j = await r.json();
+          if (j && j.articles && typeof j.articles === 'object') server = j.articles;
+        }
       }
     } catch (e) { /* 没有 API（纯静态部署）就走本机 */ }
 
@@ -88,6 +94,11 @@ window.KB = window.KB || {};
     writeLocal(KB.userArticles);
 
     const payload = JSON.stringify({ version: 1, articles: KB.userArticles });
+    if (STATIC_HOST) {
+      KB.contentSource = 'local';
+      KB.showToast('已保存在本机浏览器（静态托管没有内容服务器）');
+      return false;
+    }
     try {
       const r = await KB.fetchTimeout(API, {
         method: 'PUT',
