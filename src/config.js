@@ -81,4 +81,5 @@ KB.byId = Object.create(null);
 KB.neighborMap = new Map();
 KB.graphLinks = [];
 KB.graph = null;
+KB._modelCenter = { x: 0, y: 0, z: 0 };
 KB.reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

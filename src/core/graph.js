@@ -250,6 +250,72 @@ function forceYSoft(alpha) {
 }
 forceZ.initialize = forceRing.initialize = forceYSoft.initialize = () => {};
 
+/* ---------- 旋转中心与空闲自转 ---------- */
+KB._lastAct = performance.now();
+
+/* 任何拖动/滚轮前把轨道中心拉回模型中心，保持视线方向不变 */
+KB.recenterOrbit = function () {
+  const g = KB.graph;
+  if (!g) return;
+  /* 内部模型允许自由穿行，不强制回中；总图拖动必须绕模型中心转 */
+  if (KB.state.subOf) return;
+  const cam = g.camera();
+  const c = g.controls();
+  if (!cam || !c) return;
+  const center = KB._modelCenter || { x: 0, y: 0, z: 0 };
+  const t = c.target;
+  const dist = Math.hypot(cam.position.x - center.x, cam.position.y - center.y, cam.position.z - center.z);
+  if (dist < 2) return;
+  let fx = t.x - cam.position.x, fy = t.y - cam.position.y, fz = t.z - cam.position.z;
+  const fl = Math.hypot(fx, fy, fz) || 1;
+  fx /= fl; fy /= fl; fz /= fl;
+  c.target.set(center.x, center.y, center.z);
+  cam.position.set(center.x - fx * dist, center.y - fy * dist, center.z - fz * dist);
+  c.update();
+};
+
+/* 空闲一会儿后让模型自己慢慢转；用户一动就立刻停下，过几秒再恢复 */
+KB.autoOrbitTick = function () {
+  const now = performance.now();
+  const dt = Math.min(0.05, Math.max(0, (now - (KB._autoLast || now)) / 1000));
+  KB._autoLast = now;
+  if (!KB.graph || KB.state.mode !== '3d') return;
+  if (KB._orbiting || KB._flying || KB._wheelEasing) return;
+  if (now - (KB._lastAct || 0) < 3200) return;
+  const cam = KB.graph.camera();
+  const c = KB.graph.controls();
+  if (!cam || !c) return;
+  const center = KB.state.subOf ? { x: 0, y: 0, z: 0 } : (KB._modelCenter || { x: 0, y: 0, z: 0 });
+  if (Math.hypot(c.target.x - center.x, c.target.y - center.y, c.target.z - center.z) > 6) return;
+  const dx = cam.position.x - center.x, dz = cam.position.z - center.z;
+  const r = Math.hypot(dx, dz);
+  if (r < 60) return;
+  const a = 0.05 * dt;                        // 约 3°/秒，和帧率无关
+  const ca = Math.cos(a), sa = Math.sin(a);
+  cam.position.x = center.x + dx * ca - dz * sa;
+  cam.position.z = center.z + dx * sa + dz * ca;
+  cam.lookAt(c.target);
+  c.update();
+};
+
+/* 用户一操作就记时间，自转暂停；拖动前先回中 */
+(function bindActivity () {
+  const mark = () => { KB._lastAct = performance.now(); };
+  window.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest || !e.target.closest('#graph canvas')) return;
+    mark();
+    KB.recenterOrbit();
+  }, true);
+  window.addEventListener('wheel', (e) => {
+    if (!e.target.closest || !e.target.closest('#graph canvas')) return;
+    mark();
+  }, { capture: true, passive: true });
+  window.addEventListener('touchstart', (e) => {
+    if (!e.target.closest || !e.target.closest('#graph canvas')) return;
+    mark();
+  }, { capture: true, passive: true });
+})();
+
 /* ---------- 初始化 ---------- */
 KB.initGraph = function () {
   const g = ForceGraph3D({ controlType: 'orbit' })(document.getElementById('graph'));
@@ -363,13 +429,15 @@ KB.installWheelControl = function (g) {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
     easing = false;
+    KB._wheelEasing = false;
   }
 
   function easeStep(now) {
     if (!easing) return;
     const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000));
     lastT = now;
-    const k = 1 - Math.exp(-dt / TIME_CONST);
+    const tc = flying ? 0.24 : 0.14;
+    const k = 1 - Math.exp(-dt / tc);
     cam.position.lerp(want.pos, k);
     controls.target.lerp(want.target, k);
     controls.update();
@@ -381,12 +449,14 @@ KB.installWheelControl = function (g) {
       controls.update();
       rafId = 0;
       easing = false;
+      KB._wheelEasing = false;
     }
   }
 
   function runEase() {
     if (easing) return;
     easing = true;
+    KB._wheelEasing = true;
     lastT = performance.now();
     rafId = requestAnimationFrame(easeStep);
   }
@@ -437,7 +507,7 @@ KB.installWheelControl = function (g) {
           KB.showToast('已进入穿行：滚轮前后移动 · 左键转向 · 右键平移');
         }
         flying = true;
-        const step = stepOf(r, mag);
+        const step = stepOf(r, mag) * (KB.state.subOf ? 0.72 : 1);
         /* 第一人称直线前进：不自动拐弯，只保留最外圈的软边界 */
         const next = want.pos.clone().addScaledVector(dir, step);
         const limit = (KB._cloudR || 900) + 260;
@@ -693,6 +763,7 @@ KB.fitNodes = function (nodes, ms) {
   let cx = 0, cy = 0, cz = 0;
   ns.forEach(n => { cx += n.x; cy += n.y; cz += n.z; });
   cx /= ns.length; cy /= ns.length; cz /= ns.length;
+  if (ns.length === KB.NODES.length) KB._modelCenter = { x: cx, y: cy, z: cz };
 
   const cur = KB.graph.cameraPosition();
   let ux = cur.x - cx, uy = cur.y - cy, uz = cur.z - cz;
