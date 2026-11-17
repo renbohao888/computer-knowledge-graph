@@ -180,6 +180,7 @@ window.KB = window.KB || {};
       .onBackgroundClick(() => {});
 
     KB.withSceneFade(() => {
+      if (KB._cancelFly) KB._cancelFly();
       g.graphData({ nodes, links });
       KB.renderSubPanel(id);
       KB.updateViewOffset();
