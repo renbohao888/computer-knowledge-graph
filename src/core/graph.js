@@ -39,9 +39,9 @@ KB.colorOfNode = function (n) {
   if (s.selected) {
     if (n.id === s.selected) return base;
     const nb = KB.neighborMap.get(s.selected) || [];
-    if (nb.some(e => e.id === n.id)) return KB.fade(base, 0.15);
-    if (!KB.matches(n)) return KB.fade(base, 0.94);
-    return KB.fade(base, 0.9);
+    if (nb.some(e => e.id === n.id)) return KB.fade(base, 0.08);
+    if (!KB.matches(n)) return KB.fade(base, 0.78);
+    return KB.fade(base, 0.62);
   }
 
   if (!KB.matches(n)) return KB.fade(base, 0.74);
@@ -60,7 +60,7 @@ KB.colorOfLink = function (l) {
     return KB.fade(KB.LINK_BASE, 0.9);
   }
   if (KB.state.focus && !(KB.inFocusSet(s) && KB.inFocusSet(t))) return KB.fade(KB.LINK_BASE, 0.86);
-  if (KB.state.selected && !KB.isHotLink(l)) return KB.fade(KB.LINK_BASE, 0.93);
+  if (KB.state.selected && !KB.isHotLink(l)) return KB.fade(KB.LINK_BASE, 0.82);
   if (!KB.matches(a) || !KB.matches(b)) return KB.fade(KB.LINK_BASE, 0.8);
   return KB.fade(KB.LINK_BASE, 0.42);
 };

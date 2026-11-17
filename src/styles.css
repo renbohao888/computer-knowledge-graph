@@ -58,6 +58,15 @@ button{cursor:pointer;border:0;background:none;padding:0}
 #labels{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden;transition:opacity .25s}
 body.labels-off #labels{opacity:0}
 
+/* 节点光晕：DOM 叠加一层柔光，补上 3D 里没有的 bloom */
+.node-halo{
+  position:absolute;left:0;top:0;border-radius:50%;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  transition:opacity .25s;
+  will-change:transform,opacity;
+}
+
 /* 层刻度：把 8 个分层在画面上的高度标出来，和 3D 里的平面一一对应 */
 #layerAxis{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
 .axis-row{
@@ -254,10 +263,11 @@ body.labels-off #labels{opacity:0}
 #panel::-webkit-scrollbar{width:8px}
 #panel::-webkit-scrollbar-thumb{background:rgba(124,168,224,.18);border-radius:4px}
 .panel-close{
-  position:absolute;right:16px;top:16px;width:26px;height:26px;border-radius:8px;
-  color:var(--faint);font-size:14px;line-height:1;
+  position:absolute;right:16px;top:16px;width:32px;height:32px;border-radius:9px;
+  color:#8ea4c4;font-size:16px;line-height:1;
+  background:rgba(255,255,255,.05);border:1px solid rgba(124,168,224,.18);
 }
-.panel-close:hover{background:rgba(255,255,255,.07);color:#fff}
+.panel-close:hover{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(124,168,224,.35)}
 
 .p-layer{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--muted);letter-spacing:.02em;padding-right:30px}
 .p-stack{display:flex;flex-direction:column;gap:2px;width:10px;height:30px;flex:none}
@@ -354,6 +364,20 @@ body.labels-off #labels{opacity:0}
 .a-links a:hover{color:#dff3ff}
 .a-empty{padding:18px 0 8px;font-size:12px;color:#5b6c88;line-height:1.9}
 .a-empty b{color:#8ea4c4;font-weight:600}
+
+/* —— 2D 平面关系图 —— */
+.p-map{
+  margin:14px 0 6px;padding:4px;border-radius:12px;
+  border:1px solid rgba(124,168,224,.12);background:rgba(6,10,18,.45);
+}
+.p-map svg{display:block;width:100%;height:auto}
+.map-edge{fill:none;stroke:rgba(92,200,255,.26);stroke-width:1}
+.map-rel{font-size:7.5px;fill:#6f86a8;text-anchor:middle}
+.map-name{font-size:8.5px;fill:#b9c9e2}
+.map-tag{font-size:8px;fill:#41506a;letter-spacing:.06em}
+.map-node{cursor:pointer}
+.map-node:hover circle{filter:drop-shadow(0 0 5px rgba(255,255,255,.6))}
+.map-halo{fill:none;stroke:rgba(92,200,255,.35);stroke-width:1}
 
 /* —— 我的进度 —— */
 .p-progress{display:flex;align-items:center;gap:6px;margin-top:12px;flex-wrap:wrap}

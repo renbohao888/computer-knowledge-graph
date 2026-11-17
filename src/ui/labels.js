@@ -8,6 +8,14 @@ window.KB = window.KB || {};
 
 const nodeEls = new Map();
 const nodeW = new Map();
+const haloEls = new Map();
+
+function rgba(hex, a) {
+  let h = String(hex).replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
 const edgeEls = [];        // 与 KB.graphLinks 中非 learn 连线一一对应
 const boxes = [];          // 本帧已占用的矩形
 let nodeVec = null;
@@ -23,6 +31,20 @@ KB.buildLabels = function () {
   layer.innerHTML = '';
   nodeEls.clear();
   nodeW.clear();
+
+  /* 先放光晕，再放文字，光晕在底层 */
+  haloEls.clear();
+  KB.NODES.forEach(n => {
+    const halo = document.createElement('div');
+    halo.className = 'node-halo';
+    const c = KB.STATUS_COLOR[n.status] || '#9fb3cc';
+    halo.style.background = `radial-gradient(circle, ${rgba(c, 0.55)} 0%, ${rgba(c, 0.18)} 42%, ${rgba(c, 0)} 70%)`;
+    const size = 34 + Math.min(n._deg || 0, 8) * 4;
+    halo.style.width = size + 'px';
+    halo.style.height = size + 'px';
+    layer.appendChild(halo);
+    haloEls.set(n.id, halo);
+  });
 
   KB.NODES.forEach(n => {
     const el = document.createElement('div');
@@ -120,21 +142,28 @@ KB.tickLabels = function (cam) {
       if (!obj) { el.style.opacity = '0'; continue; }
 
       const p = project(obj.position, cam, w, h);
+      const halo = haloEls.get(n.id);
       if (p.z > 1 || p.x < -0.06 * w || p.x > 1.06 * w || p.y < -0.06 * h || p.y > 1.06 * h) {
         el.style.opacity = '0';
+        if (halo) halo.style.opacity = '0';
         continue;
       }
 
-      let prio = 1, op = 0.68;
-      if (st.selected === n.id || st.hover === n.id) { prio = 4; op = 1; }
-      else if (st.focus && KB.inFocusSet(n.id)) { prio = 2; op = 0.9; }
-      else if (st.focus) { prio = 0; op = 0.1; }
+      let prio = 1, op = 0.68, hOp = 0.45, hScale = 1;
+      if (st.selected === n.id || st.hover === n.id) { prio = 4; op = 1; hOp = 1; hScale = st.selected === n.id ? 1.7 : 1.25; }
+      else if (st.focus && KB.inFocusSet(n.id)) { prio = 2; op = 0.9; hOp = 0.85; }
+      else if (st.focus) { prio = 0; op = 0.1; hOp = 0.08; }
       else if (st.selected) {
         const nb = KB.neighborMap.get(st.selected) || [];
-        if (nb.some(e => e.id === n.id)) { prio = 3; op = 0.92; }
-        else { prio = 0; op = 0.05; }
+        if (nb.some(e => e.id === n.id)) { prio = 3; op = 0.95; hOp = 0.8; hScale = 1.15; }
+        else { prio = 0; op = 0.32; hOp = 0.12; }
       }
-      else if (!KB.matches(n)) { prio = 0; op = 0.16; }
+      else if (!KB.matches(n)) { prio = 0; op = 0.16; hOp = 0.08; }
+
+      if (halo) {
+        halo.style.transform = `translate3d(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px,0) translate(-50%,-50%) scale(${hScale})`;
+        if (!KB._orbiting) halo.style.opacity = String(hOp);
+      }
 
       /* 选中的点更大，名字抬高一点，别压在球和光环上 */
       const yOff = (st.selected === n.id) ? -40 : -13;

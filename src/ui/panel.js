@@ -72,11 +72,11 @@ KB.renderPanel = function (id) {
   const st = KB.effStatus(n);
   const color = KB.STATUS_COLOR[st] || '#9fb3cc';
   const article = (KB.ARTICLES || {})[id];
-  const wanted = KB.state.panelTab || 'overview';
-  const tab = (wanted === 'article' && !article) ? 'overview' : wanted;
+  const tab = KB.state.panelTab || 'overview';
 
   const overview = `
     <p class="p-desc">${KB.esc(n.description)}</p>
+    ${renderNeighborMap(id, preIds, afterIds, related)}
     <p class="p-layerdef">${KB.esc(KB.LAYER_INFO[n.layer] || '')}</p>
     ${children ? `<div class="p-group">
       <div class="p-group-title"><span>细分知识点</span><em>可以继续拆下去</em><b>${n.children.length}</b></div>
@@ -127,6 +127,68 @@ KB.renderPanel = function (id) {
     if (el) el.scrollIntoView({ block: 'center' });
   }
 };
+
+/* 2D 平面关系图：当前节点居中，前置在左、后续在右、其他关联在下 */
+function renderNeighborMap(id, preIds, postIds, relIds) {
+  const W = 400;
+  const rows = Math.max(preIds.length, postIds.length, 1);
+  const gap = rows > 6 ? 38 : 44;
+  const H = Math.max(190, rows * gap + 44);
+  const cx = W / 2, cy = H / 2;
+  const relOf = new Map((KB.neighborMap.get(id) || []).map(e => [e.id, e]));
+
+  const short = (s) => (s.length > 9 ? s.slice(0, 9) + '…' : s);
+  const colorOf = (oid) => KB.STATUS_COLOR[KB.effStatus(KB.byId[oid])] || '#9fb3cc';
+
+  const row = (list, x) => list.map((pid, i) => ({
+    pid, x, y: cy + (i - (list.length - 1) / 2) * gap
+  }));
+  const pre = row(preIds, 60);
+  const post = row(postIds, W - 60);
+  const rel = relIds.map((pid, i) => ({
+    pid,
+    x: 36 + (i + 0.5) * ((W - 72) / Math.max(1, relIds.length)),
+    y: H - 24
+  }));
+
+  /* 邻居多的时候关系文字会互相压字，这时候只画线，关系交给下面的列表 */
+  const showEdgeLabels = preIds.length <= 3 && postIds.length <= 3 && relIds.length <= 4;
+
+  const edgeOf = (o) => {
+    const mx = (cx + o.x) / 2;
+    const my = (cy + o.y) / 2 + (o.y > cy + 40 ? 8 : 0);
+    const d = `M ${cx} ${cy} Q ${mx} ${my} ${o.x} ${o.y}`;
+    const e = relOf.get(o.pid);
+    const label = (showEdgeLabels && e) ? e.relation : '';
+    return `<path d="${d}" class="map-edge" />` +
+      (label ? `<text x="${mx}" y="${my - 3}" class="map-rel">${KB.esc(label.length > 6 ? label.slice(0, 6) + '…' : label)}</text>` : '');
+  };
+
+  const nodeAt = (o, r) => {
+    const p = KB.byId[o.pid];
+    const x = o.x.toFixed(1), y = o.y.toFixed(1);
+    return `<g class="map-node" data-goto="${KB.esc(o.pid)}">
+      <rect x="${(o.x - 46).toFixed(1)}" y="${(o.y - 14).toFixed(1)}" width="92" height="${r * 2 + 22}"
+            fill="transparent" pointer-events="all" />
+      <circle cx="${x}" cy="${y}" r="${r}" fill="${colorOf(o.pid)}" />
+      <text x="${x}" y="${(o.y + r + 12).toFixed(1)}" text-anchor="middle" class="map-name">${KB.esc(short(p.name))}</text>
+    </g>`;
+  };
+
+  return `<div class="p-map"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="关系平面图">
+    <text x="12" y="16" class="map-tag">前置</text>
+    <text x="${W - 12}" y="16" text-anchor="end" class="map-tag">后续</text>
+    ${preIds.length ? `<text x="12" y="${H - 6}" class="map-tag">关联</text>` : ''}
+    ${pre.map(edgeOf).join('')}
+    ${post.map(edgeOf).join('')}
+    ${rel.map(edgeOf).join('')}
+    <circle cx="${cx}" cy="${cy}" r="11" fill="${colorOf(id)}" class="map-center" />
+    <circle cx="${cx}" cy="${cy}" r="18" fill="none" class="map-halo" />
+    ${pre.map(o => nodeAt(o, 7)).join('')}
+    ${post.map(o => nodeAt(o, 7)).join('')}
+    ${rel.map(o => nodeAt(o, 6)).join('')}
+  </svg></div>`;
+}
 
 /* 教程正文：一个块里可以同时有标题、段落、列表、代码，按出现顺序拼接 */
 function renderArticle(blocks) {
