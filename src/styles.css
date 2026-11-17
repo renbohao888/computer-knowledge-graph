@@ -67,22 +67,7 @@ body.labels-off #labels{opacity:0}
   will-change:transform,opacity;
 }
 
-/* 层刻度：把 8 个分层在画面上的高度标出来，和 3D 里的平面一一对应 */
-#layerAxis{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
-.axis-row{
-  position:absolute;left:292px;display:flex;align-items:center;gap:8px;
-  transform:translateY(-50%);transition:opacity .2s;
-}
-.axis-row span{
-  flex:none;font-size:10px;color:#4f6080;letter-spacing:.04em;
-  text-align:left;white-space:nowrap;
-}
-.axis-row i{
-  flex:none;width:34px;height:1px;
-  background:repeating-linear-gradient(90deg,rgba(124,168,224,.16) 0 3px,transparent 3px 9px);
-}
-.axis-row.active span{color:var(--cyan)}
-.axis-row.active i{background:repeating-linear-gradient(90deg,rgba(92,200,255,.42) 0 3px,transparent 3px 10px)}
+/* 层刻度已移除（跟着 3D 投影会漂移），分层图例在左侧栏 */
 .node-label{
   position:absolute;left:0;top:0;
   font-size:10.5px;line-height:1;color:#aec1db;letter-spacing:.01em;white-space:nowrap;
@@ -436,6 +421,17 @@ body.labels-off #labels{opacity:0}
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
 }
 #tooltip.show{opacity:1}
+
+/* 模式切换提示 */
+#toast{
+  position:fixed;left:50%;bottom:92px;z-index:16;pointer-events:none;
+  padding:8px 14px;border-radius:10px;white-space:nowrap;
+  background:rgba(10,17,29,.94);border:1px solid rgba(92,200,255,.25);
+  color:#cfeaff;font-size:12px;
+  transform:translate(-50%,8px);opacity:0;
+  transition:opacity .2s,transform .2s;
+}
+#toast.show{opacity:1;transform:translate(-50%,0)}
 .tt-name{font-size:12.5px;font-weight:600;color:#eaf2ff}
 .tt-meta{display:flex;gap:8px;margin-top:3px;font-size:10.5px;color:var(--muted)}
 .tt-meta span{display:inline-flex;align-items:center;gap:4px}

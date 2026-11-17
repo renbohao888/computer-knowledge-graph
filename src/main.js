@@ -47,7 +47,6 @@ function frame() {
   if (!KB.graph) return;
   const cam = KB.graph.camera();
   if (!cam) return;
-  KB.updateAxis(cam);
   KB.tickLabels(cam);
 }
 
@@ -67,7 +66,6 @@ KB.boot = function () {
 
   KB.initGraph();
   KB.buildLabels();
-  KB.buildAxis();
   KB.updateMatchStat();
 
   requestAnimationFrame(frame);
@@ -76,6 +74,19 @@ KB.boot = function () {
   const canvas = document.querySelector('#graph canvas');
   if (canvas) {
     canvas.addEventListener('pointerdown', () => { KB._orbitCancel = true; }, { passive: true });
+
+    /* 右键：屏蔽浏览器菜单；单击（没有拖动）切换左键的旋转/平移 */
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    let rdown = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.button === 2) rdown = { x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener('pointerup', (e) => {
+      if (e.button !== 2 || !rdown) return;
+      const moved = Math.hypot(e.clientX - rdown.x, e.clientY - rdown.y);
+      rdown = null;
+      if (moved < 5) KB.toggleLeftMode();
+    });
   }
 
   /* 直接打开 #/redis 这样的地址，自动进入那个知识点的详情页 */

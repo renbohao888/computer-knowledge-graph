@@ -252,52 +252,5 @@ KB.tickLabels = function (cam) {
   }
 };
 
-/* ---------- 层刻度：把 11 层在画面上的高度标出来 ---------- */
-const axisRows = new Map();
-let axisVec = null;
-
-KB.buildAxis = function () {
-  const box = document.getElementById('layerAxis');
-  if (!box) return;
-  box.innerHTML = '';
-  axisRows.clear();
-  KB.LAYERS.forEach(l => {
-    const el = document.createElement('div');
-    el.className = 'axis-row';
-    el.innerHTML = `<span>${KB.esc(l)}</span><i></i>`;
-    box.appendChild(el);
-    axisRows.set(l, el);
-  });
-};
-
-KB.updateAxis = function (cam) {
-  if (!axisRows.size) return;
-  if (!axisVec) axisVec = KB.graph.camera().position.clone();
-  const h = window.innerHeight;
-
-  /* 用层中心 (0, layerY, 0) 投影：世界坐标的 y 是有序的，
-     所以刻度永远按顺序排列，相当于一把标尺。 */
-  /* 层与层在屏幕上靠得太近（或上下顺序被打乱）时，只保留放得下的，
-     否则左下角会糊成一团 */
-  let lastY = -Infinity;
-  KB.LAYERS.forEach(l => {
-    const el = axisRows.get(l);
-    if (!el) return;
-    axisVec.set(0, KB.layerY[l], 0).project(cam);
-    if (axisVec.z > 1 || axisVec.y < -1.05 || axisVec.y > 1.05) {
-      el.style.opacity = '0';
-      el.classList.remove('active');
-      return;
-    }
-    const y = (-axisVec.y * 0.5 + 0.5) * h;
-    if (y - lastY < 14) {
-      el.style.opacity = '0';
-      el.classList.remove('active');
-      return;
-    }
-    lastY = y;
-    el.style.top = y.toFixed(1) + 'px';
-    el.style.opacity = '';
-    el.classList.toggle('active', KB.state.layer === l);
-  });
-};
+/* 层刻度已移除：它是跟着 3D 投影动的，文字会缩放漂移。
+   分层图例固定在左侧栏里，不再跟着模型转。 */

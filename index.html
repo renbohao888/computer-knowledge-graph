@@ -14,7 +14,6 @@
 <div id="atmosphere"></div>
 <div id="vignette"></div>
 <div id="labels"></div>
-<div id="layerAxis"></div>
 
 <!-- 左上：标题 · 方向 · 分层 · 掌握度 -->
 <aside id="rail">
@@ -26,7 +25,7 @@
     <div class="track-grid" id="trackGrid"></div>
   </div>
 
-  <div class="rail-section collapsed">
+  <div class="rail-section">
     <div class="rail-title"><span>分层</span><em>点击筛选</em></div>
     <ul id="layerList"></ul>
   </div>
@@ -45,10 +44,10 @@
   </div>
 
   <div class="rail-foot">
-    左键拖拽旋转 · 右键拖拽平移 · 滚轮缩放<br>
+    左键拖拽旋转 · 滚轮缩放<br>
+    右键单击：切换左键为平移 · 右键拖拽也可平移<br>
     单击看详情 · 双击聚焦邻域<br>
-    按 / 搜索并定位知识点<br>
-    球越大，连接的节点越多
+    按 / 搜索并定位知识点
   </div>
 </aside>
 
@@ -75,6 +74,7 @@
 
 <div id="tooltip"></div>
 <div id="focusBadge"></div>
+<div id="toast"></div>
 
 <div id="boot">
   <div class="boot-card">

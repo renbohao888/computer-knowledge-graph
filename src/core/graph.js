@@ -352,3 +352,14 @@ KB.setCursor = function (c) {
   const el = document.querySelector('#graph canvas');
   if (el) el.style.cursor = c;
 };
+
+/* 右键单击：左键在"旋转 / 平移"之间切换 */
+KB.toggleLeftMode = function () {
+  const controls = KB.graph && KB.graph.controls && KB.graph.controls();
+  if (!controls || !controls.mouseButtons) return;
+  const toPan = controls.mouseButtons.LEFT !== 2;
+  controls.mouseButtons.LEFT = toPan ? 2 : 0;   // 2 = PAN, 0 = ROTATE
+  KB.state.leftMode = toPan ? 'pan' : 'rotate';
+  KB.setCursor(toPan ? 'move' : 'grab');
+  KB.showToast(toPan ? '左键拖拽 = 平移（右键再点一下切回旋转）' : '左键拖拽 = 旋转（右键点一下切换平移）');
+};

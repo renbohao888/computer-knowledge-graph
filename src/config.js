@@ -69,7 +69,8 @@ KB.state = {
   hoverLink: null,
   labels: true,
   relations: true,
-  panelTab: 'overview'   // 详情页当前标签：overview / article
+  panelTab: 'overview',  // 详情页当前标签：overview / article
+  leftMode: 'rotate'     // 左键当前行为：rotate / pan（右键单击切换）
 };
 
 /* 派生数据（由 store.js 填充） */

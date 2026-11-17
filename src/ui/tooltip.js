@@ -50,3 +50,13 @@ KB.hideTip = function () {
   const el = KB.getTip();
   if (el) el.classList.remove('show');
 };
+
+/* 短暂提示：切换操作模式时告诉用户现在左键是什么 */
+KB.showToast = function (text) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(KB._toastT);
+  KB._toastT = setTimeout(() => el.classList.remove('show'), 1800);
+};
