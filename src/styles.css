@@ -377,6 +377,8 @@ body.labels-off #labels{opacity:0}
   will-change:transform,opacity;transition:color .15s,opacity .15s,background .15s;
 }
 .edge-label.is-hot{color:#c9ecff;background:rgba(9,24,40,.92)}
+/* 相机做轨道动画时先藏起关系文字，动画结束再回来 */
+#labels.orbiting .edge-label{opacity:0 !important;transition:none}
 
 /* —— 细分知识点 —— */
 .p-children{display:flex;flex-direction:column;gap:4px}

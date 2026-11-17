@@ -181,7 +181,17 @@ KB.orbitTo = function (node, ms) {
   while (da > Math.PI) da -= Math.PI * 2;
   while (da < -Math.PI) da += Math.PI * 2;
 
-  const dur = KB.reduceMotion ? 0 : (ms || 1050);
+  const dur = KB.reduceMotion ? 0 : (ms || 1450);
+  const labelsEl = document.getElementById('labels');
+  const startOrbit = () => {
+    KB._orbiting = true;
+    if (labelsEl) labelsEl.classList.add('orbiting');
+  };
+  const endOrbit = () => {
+    KB._orbiting = false;
+    if (labelsEl) labelsEl.classList.remove('orbiting');
+    if (KB.graph) KB.graph.linkDirectionalParticles(KB.particleCount);
+  };
   /* 走库自己的 cameraPosition：它会同时同步 controls 的注视点。
      直接改 camera.position 而不动 controls，镜头会指偏。 */
   const place = (a, e, r) => {
@@ -211,13 +221,16 @@ KB.orbitTo = function (node, ms) {
 
   if (!dur) { place(a1, e1, r1); return; }
 
+  startOrbit();
   const t0 = performance.now();
   const step = () => {
-    if (KB._orbitCancel) return;
+    if (KB._orbitCancel) { endOrbit(); return; }
     const t = Math.min(1, (performance.now() - t0) / dur);
-    const k = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;  // easeInOutQuad
+    /* easeInOutQuint：起步和收尾都更软，不会"弹一下" */
+    const k = t < 0.5 ? 16 * Math.pow(t, 5) : 1 - Math.pow(-2 * t + 2, 5) / 2;
     place(a0 + da * k, e0 + (e1 - e0) * k, r0 + (r1 - r0) * k);
     if (t < 1) requestAnimationFrame(step);
+    else endOrbit();
   };
   requestAnimationFrame(step);
 };
@@ -278,20 +291,23 @@ KB.fitNodes = function (nodes, ms) {
   ux /= dist; uy /= dist; uz /= dist;
 
   const v = cam.position.clone();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 6; i++) {
     cam.position.set(cx + ux * dist, cy + uy * dist, cz + uz * dist);
     cam.lookAt(cx, cy, cz);
     cam.updateMatrixWorld(true);
     cam.updateProjectionMatrix();
 
-    let maxN = 0;
+    let maxN = 0, behind = 0;
     for (let j = 0; j < ns.length; j++) {
       v.copy(ns[j].__threeObj.position).project(cam);
-      if (v.z > 1) continue;
+      /* 在相机后面的点会被跳过，但那样会取景过近，
+         所以一旦发现有节点在背后，就把相机往后退。 */
+      if (!isFinite(v.x) || !isFinite(v.y) || v.z > 1) { behind++; continue; }
       const ax = Math.abs(v.x), ay = Math.abs(v.y);
       if (ax > maxN) maxN = ax;
       if (ay > maxN) maxN = ay;
     }
+    if (behind) { dist *= 1.6; continue; }
     if (maxN < 0.001) break;
     dist = Math.max(120, dist * maxN / 0.86);
   }

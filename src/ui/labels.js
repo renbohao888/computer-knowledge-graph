@@ -116,25 +116,35 @@ KB.tickLabels = function (cam) {
       items.push({ n, el, x: p.x, y: p.y - 13, prio, op, hot: st.selected === n.id || st.hover === n.id });
     }
 
-    items.sort((a, b) => (b.prio - a.prio) || ((b.n._deg || 0) - (a.n._deg || 0)) ||
-      (a.n.id < b.n.id ? -1 : 1));
+    if (KB._orbiting) {
+      /* 轨道动画期间只移动，不重排：省掉排序和包围盒检测，避免掉帧 */
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        it.el.style.transform = `translate3d(${it.x.toFixed(1)}px,${it.y.toFixed(1)}px,0) translate(-50%,-50%)`;
+        it.el.classList.toggle('is-hot', it.hot);
+      }
+    } else {
+      items.sort((a, b) => (b.prio - a.prio) || ((b.n._deg || 0) - (a.n._deg || 0)) ||
+        (a.n.id < b.n.id ? -1 : 1));
 
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      it.el.style.transform = `translate3d(${it.x.toFixed(1)}px,${it.y.toFixed(1)}px,0) translate(-50%,-50%)`;
-      it.el.classList.toggle('is-hot', it.hot);
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        it.el.style.transform = `translate3d(${it.x.toFixed(1)}px,${it.y.toFixed(1)}px,0) translate(-50%,-50%)`;
+        it.el.classList.toggle('is-hot', it.hot);
 
-      const halfW = (nodeW.get(it.n.id) || it.n.name.length * 11) / 2 + 8;
-      const box = { x1: it.x - halfW, x2: it.x + halfW, y1: it.y - 11, y2: it.y + 11 };
-      if (overlaps(box)) { it.el.style.opacity = '0'; continue; }
-      boxes.push(box);
-      it.el.style.opacity = String(it.op);
+        const halfW = (nodeW.get(it.n.id) || it.n.name.length * 11) / 2 + 8;
+        const box = { x1: it.x - halfW, x2: it.x + halfW, y1: it.y - 11, y2: it.y + 11 };
+        if (overlaps(box)) { it.el.style.opacity = '0'; continue; }
+        boxes.push(box);
+        it.el.style.opacity = String(it.op);
+      }
     }
   } else {
     nodeEls.forEach(el => { el.style.opacity = '0'; });
   }
 
   /* ---------- 连线关系 ---------- */
+  if (KB._orbiting) return;   // 轨道动画期间由 CSS 隐藏，跳过整段计算
   const showEdges = st.relations;
   const cands = [];
   for (let i = 0; i < KB.graphLinks.length; i++) {

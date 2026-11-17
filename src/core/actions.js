@@ -7,19 +7,40 @@ let clickTimer = null;
 let clickCandidate = null;
 let didInitialFit = false;
 
-/* 单击 / 双击判定：300ms 内两次点同一节点算双击 */
-KB.handleNodeClick = function (node) {
-  if (clickTimer && clickCandidate === node.id) {
+/* 屏幕距离：节点中心到鼠标位置的像素距离 */
+KB.screenDistance = function (node, ev, cam) {
+  if (!node || !node.__threeObj || !ev) return Infinity;
+  const v = cam.position.clone().copy(node.__threeObj.position).project(cam);
+  if (v.z > 1) return Infinity;
+  const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-v.y * 0.5 + 0.5) * window.innerHeight;
+  return Math.hypot(x - ev.clientX, y - ev.clientY);
+};
+
+/* 单击 / 双击判定：280ms 内两次点同一节点算双击。
+   几个节点在屏幕上重叠时，射线可能先打到前面那个；
+   如果命中点离线很远、而另一个节点中心就在指尖下，按指尖下那个算。 */
+KB.handleNodeClick = function (node, ev) {
+  let target = node;
+  const near = KB.nearestNodeToEvent(ev);
+  if (near && near.id !== node.id && ev && KB.graph) {
+    const cam = KB.graph.camera();
+    const d1 = KB.screenDistance(node, ev, cam);
+    const d2 = KB.screenDistance(near, ev, cam);
+    if (d1 > 10 && d2 < 8) target = near;
+  }
+
+  if (clickTimer && clickCandidate === target.id) {
     clearTimeout(clickTimer);
     clickTimer = null; clickCandidate = null;
-    KB.toggleFocus(node.id);
+    KB.toggleFocus(target.id);
     return;
   }
-  clickCandidate = node.id;
+  clickCandidate = target.id;
   clickTimer = setTimeout(() => {
     clickTimer = null; clickCandidate = null;
-    KB.selectNode(node.id, true);
-  }, 280);
+    KB.selectNode(target.id, true);
+  }, 260);
 };
 
 /* 点空白处：
@@ -53,6 +74,8 @@ KB.handleBackgroundClick = function (ev) {
 };
 
 KB.handleNodeHover = function (node) {
+  /* 轨道旋转期间不弹提示，否则镜头一动、鼠标下换了个东西就会闪 */
+  if (KB._orbiting) { KB.state.hover = null; KB.hideTip(); return; }
   KB.state.hover = node ? node.id : null;
   if (node) KB.showNodeTip(node);
   else if (!KB.state.hoverLink) KB.hideTip();
@@ -60,6 +83,7 @@ KB.handleNodeHover = function (node) {
 };
 
 KB.handleLinkHover = function (link) {
+  if (KB._orbiting) { KB.state.hoverLink = null; KB.hideTip(); return; }
   KB.state.hoverLink = link || null;
   if (link && !KB.state.hover) KB.showLinkTip(link);
   if (!link && !KB.state.hover) KB.hideTip();
