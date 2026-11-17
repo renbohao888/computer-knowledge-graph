@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='10' fill='%235cc8ff'/%3E%3C/svg%3E">
 <title>计算机知识体系 · 3D 交互图谱</title>
 <link rel="stylesheet" href="src/styles.css">
+<link rel="stylesheet" href="src/glossary.css">
 </head>
 <body>
 
@@ -71,6 +72,7 @@
     <option value="plane">分层平面</option>
   </select></label>
   <label class="field"><span>问题域</span><select id="domainSelect"></select></label>
+  <button class="ghost" id="glossaryBtn" title="搜索全部节点与细分知识点">术语库</button>
   <button class="ghost" id="pathBtn">路线</button>
   <button class="ghost" id="labelBtn" aria-pressed="true">标签</button>
   <button class="ghost" id="relBtn" aria-pressed="true">关系</button>
@@ -86,6 +88,28 @@
 <div id="tooltip"></div>
 <div id="focusBadge"></div>
 <div id="toast"></div>
+
+<!-- 术语库：节点 + 细分知识点统一检索 -->
+<div id="glossaryOverlay" aria-hidden="true">
+  <div class="glossary-backdrop" data-close></div>
+  <section class="glossary-card" role="dialog" aria-modal="true" aria-label="计算机术语库">
+    <header class="glossary-head">
+      <div class="glossary-title">
+        <b>计算机术语库</b>
+        <span id="glossaryStats">155 个节点 · 1700+ 细分知识点</span>
+      </div>
+      <button class="glossary-close" data-close aria-label="关闭术语库">✕</button>
+    </header>
+    <div class="glossary-search">
+      <input id="glossaryInput" type="text" placeholder="搜索术语、细分点、别名或描述（例：注解 / ci cd / 主从延迟）" autocomplete="off" spellcheck="false" aria-label="搜索术语">
+    </div>
+    <div class="glossary-chips" id="glossaryChips"></div>
+    <div class="glossary-body">
+      <div class="glossary-list" id="glossaryList"></div>
+      <article class="glossary-detail" id="glossaryDetail"><div class="gempty">在左侧选择一个术语</div></article>
+    </div>
+  </section>
+</div>
 
 <div id="boot">
   <div class="boot-card">
@@ -117,6 +141,7 @@
 <script src="src/core/store.js"></script>
 <script src="src/core/progress.js"></script>
 <script src="src/core/content.js"></script>
+<script src="src/core/glossary.js"></script>
 <script src="src/core/graph.js"></script>
 <script src="src/core/actions.js"></script>
 <script src="src/core/sub-model.js"></script>
@@ -128,6 +153,7 @@
 <script src="src/ui/labels.js"></script>
 <script src="src/ui/rail.js"></script>
 <script src="src/ui/two-d.js"></script>
+<script src="src/ui/glossary.js"></script>
 <script src="src/main.js"></script>
 </body>
 </html>

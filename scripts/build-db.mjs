@@ -19,14 +19,20 @@ const ctx = { matchMedia: () => ({ matches: false }) };
 vm.createContext(ctx);
 ctx.window = ctx;
 vm.runInContext(read('src/config.js'), ctx);
+
+const dataDir = path.join(root, 'src/data');
+const pick = (re, first) => {
+  const arr = fs.readdirSync(dataDir).filter(f => re.test(f)).sort();
+  if (first) {
+    const i = arr.indexOf(first);
+    if (i > 0) arr.unshift(arr.splice(i, 1)[0]);
+  }
+  return arr.map(f => 'src/data/' + f);
+};
 [
-  'src/data/nodes.js',
-  'src/data/nodes-client.js',
-  'src/data/nodes-engineering.js',
-  'src/data/nodes-data-ai.js',
-  'src/data/nodes-systems.js',
-  'src/data/links.js',
-  'src/data/links-more.js'
+  ...pick(/^nodes.*\.js$/, 'nodes.js'),
+  ...pick(/^links.*\.js$/, 'links.js'),
+  ...pick(/^paths.*\.js$/, 'paths.js')
 ].forEach(f => vm.runInContext(read(f), ctx));
 
 const KB = ctx.KB;

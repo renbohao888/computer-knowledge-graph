@@ -15,23 +15,22 @@ const ctx = { matchMedia: () => ({ matches: false }) };
 vm.createContext(ctx);
 ctx.window = ctx;              // 让 window === 全局对象，脚本里的裸 KB 才能解析
 vm.runInContext(read('src/config.js'), ctx);
+
+/* 自动发现数据文件：新增 nodes-*.js / links-*.js / paths-*.js / details-*.js 不用改脚本 */
+const dataDir = path.join(root, 'src/data');
+const pick = (re, first) => {
+  const arr = fs.readdirSync(dataDir).filter(f => re.test(f)).sort();
+  if (first) {
+    const i = arr.indexOf(first);
+    if (i > 0) arr.unshift(arr.splice(i, 1)[0]);
+  }
+  return arr.map(f => 'src/data/' + f);
+};
 [
-  'src/data/nodes.js',
-  'src/data/nodes-client.js',
-  'src/data/nodes-engineering.js',
-  'src/data/nodes-data-ai.js',
-  'src/data/nodes-systems.js',
-  'src/data/links.js',
-  'src/data/links-more.js',
-  'src/data/paths.js',
-  'src/data/paths-more.js',
-  'src/data/details-os-net.js',
-  'src/data/details-backend.js',
-  'src/data/details-web.js',
-  'src/data/details-data-ai.js',
-  'src/data/details-infra-embedded.js',
-  'src/data/details-lang-arch.js',
-  'src/data/details-extra.js'
+  ...pick(/^nodes.*\.js$/, 'nodes.js'),   // 主文件先加载，其余靠 concat 追加
+  ...pick(/^links.*\.js$/, 'links.js'),
+  ...pick(/^paths.*\.js$/, 'paths.js'),
+  ...pick(/^details.*\.js$/)
 ].forEach(f => vm.runInContext(read(f), ctx));
 
 const KB = ctx.KB;
@@ -64,9 +63,14 @@ for (const n of nodes) {
   if (n.keywords && !Array.isArray(n.keywords)) err('keywords 必须是数组: ' + n.id);
   if (n.children) {
     if (!Array.isArray(n.children)) err('children 必须是数组: ' + n.id);
-    else n.children.forEach((c, i) => {
-      if (!c || !c.name) err(`children[${i}] 缺少 name: ${n.id}`);
-    });
+    else {
+      const seenChild = new Set();
+      n.children.forEach((c, i) => {
+        if (!c || !c.name) err(`children[${i}] 缺少 name: ${n.id}`);
+        else if (seenChild.has(c.name)) err(`children 名称重复: ${n.id} → ${c.name}`);
+        else seenChild.add(c.name);
+      });
+    }
   }
 }
 

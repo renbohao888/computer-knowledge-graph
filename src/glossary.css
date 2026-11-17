@@ -1,0 +1,120 @@
+/* ============================================================
+ * 术语库：把节点与细分知识点变成可检索词条
+ * ============================================================ */
+#glossaryOverlay{
+  position:fixed;inset:0;z-index:10000;
+  display:none;align-items:center;justify-content:center;
+  padding:24px;
+}
+#glossaryOverlay.open{display:flex}
+.glossary-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.72);backdrop-filter:blur(6px)}
+.glossary-card{
+  position:relative;z-index:1;
+  width:min(1040px,calc(100vw - 48px));
+  height:min(740px,calc(100vh - 48px));
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,rgba(14,22,38,.98),rgba(8,13,24,.98));
+  border:1px solid var(--stroke-2);border-radius:18px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+  overflow:hidden;animation:gIn .22s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes gIn{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+.glossary-head{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 18px;border-bottom:1px solid var(--stroke);
+  background:rgba(10,16,29,.85);
+}
+.glossary-title{display:flex;flex-direction:column;gap:2px}
+.glossary-title b{font-size:15px;letter-spacing:.02em;color:#eaf3ff}
+.glossary-title span{font-size:10.5px;color:#6f82a0}
+.glossary-close{margin-left:auto;width:32px;height:32px;border-radius:9px;font-size:14px;color:#8ea2be}
+.glossary-close:hover{background:rgba(255,255,255,.07);color:#fff}
+.glossary-search{padding:12px 18px 8px}
+.glossary-search input{
+  width:100%;height:40px;padding:0 14px;
+  background:rgba(9,14,25,.9);border:1px solid var(--stroke-2);border-radius:11px;
+  color:var(--text);font-size:13.5px;outline:none;
+}
+.glossary-search input:focus{border-color:rgba(92,200,255,.55);box-shadow:0 0 0 3px rgba(92,200,255,.08)}
+.glossary-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 10px;max-height:78px;overflow:auto}
+.gchip{
+  font-size:11px;padding:4px 10px;border-radius:999px;
+  background:rgba(124,168,224,.08);border:1px solid var(--stroke);color:#9fb3cc;
+}
+.gchip em{font-style:normal;margin-left:5px;color:#627693;font-size:10px}
+.gchip:hover{border-color:var(--stroke-2);color:#cfdbee}
+.gchip.on{background:rgba(92,200,255,.14);border-color:rgba(92,200,255,.45);color:#dff3ff}
+.glossary-body{
+  flex:1;min-height:0;display:grid;grid-template-columns:360px minmax(0,1fr);
+  border-top:1px solid var(--stroke);
+}
+.glossary-list{overflow:auto;padding:8px;border-right:1px solid var(--stroke);background:rgba(7,11,20,.35)}
+.grow{
+  display:flex;flex-direction:column;gap:3px;width:100%;
+  padding:9px 11px;border-radius:10px;text-align:left;
+  border:1px solid transparent;
+}
+.grow:hover{background:rgba(124,168,224,.07);border-color:rgba(124,168,224,.12)}
+.grow.on{background:rgba(92,200,255,.11);border-color:rgba(92,200,255,.35)}
+.gterm{display:flex;align-items:baseline;gap:7px;min-width:0}
+.gterm b{font-size:13.5px;color:#e8f1ff;font-weight:600}
+.gkind{
+  font-size:9px;padding:1px 5px;border-radius:5px;color:#7f93ae;
+  background:rgba(124,168,224,.1);border:1px solid var(--stroke);flex:none;
+}
+.grow.child .gkind{color:#8fdcff;border-color:rgba(92,200,255,.25)}
+.gdesc{font-size:11.5px;color:#8fa3c0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.glayer{font-size:10px;color:#627693}
+.glossary-detail{overflow:auto;padding:20px 24px 28px}
+.ghead{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;border-bottom:1px solid var(--stroke);padding-bottom:14px;margin-bottom:16px}
+.ghead h2{margin:0;font-size:24px;font-weight:650;color:#f2f8ff;letter-spacing:.01em}
+.gmeta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px;color:#7f93ae;align-items:center}
+.gkind-big{color:#8fdcff;padding:2px 7px;border-radius:6px;background:rgba(92,200,255,.1);border:1px solid rgba(92,200,255,.22)}
+.gtrack{font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(124,168,224,.1);color:#9fb3cc}
+.gcopy{font-size:11px;padding:5px 10px;border-radius:8px;color:#b7c8e2;border:1px solid var(--stroke);background:rgba(124,168,224,.07)}
+.gcopy:hover{background:rgba(124,168,224,.14)}
+.gsec{margin:0 0 18px}
+.gsec h4{margin:0 0 8px;font-size:11.5px;font-weight:600;letter-spacing:.06em;color:#7f93ae;text-transform:uppercase}
+.gsec h4 em{font-style:normal;font-size:10px;color:#5f7191;text-transform:none;letter-spacing:0;margin-left:8px}
+.gdesc-full{margin:0;font-size:13.5px;line-height:1.9;color:#cfdbee}
+.gkids{display:flex;flex-wrap:wrap;gap:6px}
+.gkid{
+  font-size:11.5px;padding:3px 8px;border-radius:7px;color:#cfdbee;
+  background:rgba(124,168,224,.07);border:1px solid var(--stroke);
+}
+.grel{display:flex;flex-direction:column;gap:5px}
+.grel-item{
+  display:flex;justify-content:space-between;gap:12px;align-items:center;
+  padding:7px 10px;border-radius:8px;text-align:left;
+  background:rgba(124,168,224,.05);border:1px solid var(--stroke);
+}
+.grel-item:hover{background:rgba(92,200,255,.1);border-color:rgba(92,200,255,.3)}
+.grel-item b{font-size:12px;color:#dfe9f7;font-weight:500}
+.grel-item span{font-size:10.5px;color:#7f93ae;white-space:nowrap}
+.gparent{
+  display:flex;flex-direction:column;gap:2px;width:100%;padding:9px 11px;
+  border-radius:9px;text-align:left;background:rgba(92,200,255,.06);
+  border:1px solid rgba(92,200,255,.22);
+}
+.gparent:hover{background:rgba(92,200,255,.13)}
+.gparent b{font-size:13px;color:#dff3ff}
+.gparent span{font-size:10.5px;color:#7f93ae}
+.gactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.gbtn{
+  padding:8px 14px;border-radius:9px;font-size:12px;
+  background:rgba(92,200,255,.16);color:#dff3ff;border:1px solid rgba(92,200,255,.4);
+}
+.gbtn:hover{background:rgba(92,200,255,.26)}
+.gbtn.ghost{background:rgba(124,168,224,.07);border-color:var(--stroke);color:#b7c8e2}
+.gempty{padding:26px 18px;color:#6f82a0;font-size:12.5px;line-height:1.9;text-align:center}
+.gintro{text-align:left;max-width:520px;margin:20px auto;line-height:2}
+.gintro b{color:#cfdbee;font-size:14px}
+.gintro code{font-size:11.5px;padding:1px 5px;border-radius:4px;background:rgba(124,168,224,.14);color:#9fb3cc}
+
+@media (max-width:900px){
+  #glossaryOverlay{padding:10px}
+  .glossary-card{width:calc(100vw - 20px);height:calc(100vh - 20px)}
+  .glossary-body{grid-template-columns:1fr;grid-template-rows:minmax(120px,36%) minmax(0,1fr)}
+  .glossary-list{border-right:0;border-bottom:1px solid var(--stroke)}
+  .glossary-head{flex-wrap:wrap;gap:8px}
+}

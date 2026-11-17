@@ -71,6 +71,7 @@ KB.boot = function () {
   KB.bindSearch();
   KB.bindRail();
   if (KB.bindPaths) KB.bindPaths();
+  if (KB.bindGlossary) KB.bindGlossary();
 
   KB.initGraph();
   KB.buildLabels();
