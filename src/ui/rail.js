@@ -175,6 +175,7 @@ KB.bindRail = function () {
       const s = KB.state;
       s.layer = null; s.domain = null; s.status = null; s.track = null;
       s.selected = null; s.focus = null;
+      KB.twoDExit();
       KB.closePanel();
       KB.updateFocusBadge();
       KB.syncFilterUI();
@@ -214,6 +215,7 @@ KB.bindRail = function () {
     if (e.key === 'Escape') {
       KB.state.focus = null;
       KB.state.selected = null;
+      KB.twoDExit();
       KB.closePanel();
       KB.updateFocusBadge();
       KB.refreshStyles();

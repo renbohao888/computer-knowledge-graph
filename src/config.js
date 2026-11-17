@@ -70,7 +70,8 @@ KB.state = {
   labels: true,
   relations: true,
   panelTab: 'overview',  // 详情页当前标签：overview / article
-  leftMode: 'rotate'     // 左键当前行为：rotate / pan（右键单击切换）
+  leftMode: 'rotate',    // 左键当前行为：rotate / pan（右键单击切换）
+  mode: '3d'             // 默认 3D；选中节点时临时切到 2D 关系图
 };
 
 /* 派生数据（由 store.js 填充） */

@@ -35,9 +35,30 @@ button,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;padding:0}
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
-#graph{position:fixed;inset:0;z-index:0}
+#graph{position:fixed;inset:0;z-index:0;transition:opacity .22s}
 #graph canvas{display:block;cursor:grab}
 #graph canvas:active{cursor:grabbing}
+
+/* 2D 关系视图：只在点开节点时出现 */
+#stage{
+  position:fixed;inset:0;z-index:1;width:100vw;height:100vh;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s;touch-action:none;
+}
+body.mode-2d #stage{opacity:1;pointer-events:auto}
+body.mode-2d #graph{opacity:0;pointer-events:none}
+body.mode-2d #labels{opacity:0;pointer-events:none}
+.n2{cursor:pointer}
+.n2 circle{transition:r .2s,fill .2s}
+.n2 text{
+  font-size:10px;fill:#b9c9e2;text-anchor:middle;pointer-events:none;
+  paint-order:stroke;stroke:#070b14;stroke-width:2.6px;stroke-linejoin:round;
+}
+.e2{fill:none;stroke-width:1.1;pointer-events:none}
+.e2l{
+  font-size:9px;fill:#7f9dc0;text-anchor:middle;pointer-events:none;
+  paint-order:stroke;stroke:#070b14;stroke-width:2.6px;stroke-linejoin:round;
+}
 /* 库自带的英文操作提示，用我们自己的中文说明代替 */
 .scene-nav-info,.scene-tooltip{display:none !important}
 

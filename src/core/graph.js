@@ -145,6 +145,7 @@ KB.refreshStyles = function () {
     .linkColor(KB.colorOfLink)
     .linkDirectionalParticles(KB.particleCount);
   KB.updateMatchStat();
+  if (KB.twoDRefresh) KB.twoDRefresh();
 };
 
 /* ---------- 相机 ---------- */

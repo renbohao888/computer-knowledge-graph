@@ -111,7 +111,8 @@ KB.selectNode = function (id, fly) {
   if (!n) return;
   if (KB.state.focus && !KB.inFocusSet(id)) KB.state.focus = null;
   KB.state.selected = id;
-  if (fly) KB.orbitTo(n);
+  /* 点击节点：摊平成 2D 关系图（前置/后续/关联环绕） */
+  KB.twoDFocus(id);
   KB.renderPanel(id);
   KB.updateFocusBadge();
   KB.refreshStyles();
@@ -123,6 +124,7 @@ KB.clearSelection = function () {
   KB.state.focus = null;
   KB.closePanel();
   KB.updateFocusBadge();
+  KB.twoDExit();
   KB.refreshStyles();
   KB.syncHash(null);
 };
@@ -148,6 +150,7 @@ KB.selectTrack = function (name) {
     KB.state.status = null;
     KB.state.selected = null;
     KB.state.focus = null;
+    KB.twoDExit();
     KB.closePanel();
     KB.updateFocusBadge();
     KB.syncFilterUI();
@@ -193,6 +196,7 @@ KB.updateGraphData = function (newData) {
   s.selected = null; s.focus = null;
   s.layer = null; s.domain = null; s.status = null; s.track = null;
 
+  KB.twoDExit();
   KB.closePanel();
   KB.updateFocusBadge();
   KB.buildIndex();

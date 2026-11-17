@@ -45,6 +45,7 @@ function showBootError() {
 function frame() {
   requestAnimationFrame(frame);
   if (!KB.graph) return;
+  if (KB.state.mode !== '3d') return;   // 2D 关系图时不更新 3D 标签
   const cam = KB.graph.camera();
   if (!cam) return;
   KB.tickLabels(cam);
@@ -66,6 +67,7 @@ KB.boot = function () {
 
   KB.initGraph();
   KB.buildLabels();
+  KB.twoDInit();
   KB.updateMatchStat();
 
   requestAnimationFrame(frame);
